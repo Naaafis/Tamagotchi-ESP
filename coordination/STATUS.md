@@ -4,9 +4,9 @@ Status: `todo` · `in progress` · `review` · `blocked` · `done`
 
 | ID | Task | Phase | Depends on | Owner | Status | Branch / PR |
 |---|---|---|---|---|---|---|
-| T0 | Bootstrap repo: plan, materials, wiring, references, coordination | 0 | — | Claude | review | `task/T0-bootstrap` |
-| T1 | Flash CircuitPython (N8R8 build) onto the S3 | 1 | — | Nafis | todo | — |
-| T2 | Screen bring-up: `code.py` draws a centered 240×240 square + text on the ILI9341 | 1 | T1 | | todo | |
+| T0 | Bootstrap repo: plan, materials, wiring, references, coordination | 0 | — | Claude | done | [#1](https://github.com/Naaafis/Tamagotchi-ESP/pull/1) |
+| T1 | Flash CircuitPython (N8R8 build) onto the S3 | 1 | — | Nafis | done | — |
+| T2 | Screen bring-up: `code.py` draws a centered 240×240 square + text on the ILI9341 | 1 | T1 | Claude | in progress | `task/T2-screen-bringup` |
 | T3 | Buttons bring-up: show which of A/B/C was pressed (keypad, pull-ups) | 1 | T2 | | todo | |
 | T4 | Backlight PWM on GPIO 7 with fade up/down | 1 | T2 | | todo | |
 | T5 | Audio bring-up: MAX98357A beep and short wav | 1 | T1 | | todo | |
