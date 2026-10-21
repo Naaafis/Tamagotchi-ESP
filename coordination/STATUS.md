@@ -6,9 +6,9 @@ Status: `todo` · `in progress` · `review` · `blocked` · `done`
 |---|---|---|---|---|---|---|
 | T0 | Bootstrap repo: plan, materials, wiring, references, coordination | 0 | — | Claude | done | [#1](https://github.com/Naaafis/Tamagotchi-ESP/pull/1) |
 | T1 | Flash CircuitPython (N8R8 build) onto the S3 | 1 | — | Nafis | done | — |
-| T2 | Screen bring-up: `code.py` draws a centered 240×240 square + text on the ILI9341 | 1 | T1 | Claude | review | [#2](https://github.com/Naaafis/Tamagotchi-ESP/pull/2) |
-| T3 | Buttons bring-up: show which of A/B/C was pressed (keypad, pull-ups) | 1 | T2 | | todo | |
-| T4 | Backlight PWM on GPIO 7 with fade up/down | 1 | T2 | | todo | |
+| T2 | Screen bring-up: `code.py` draws a centered 240×240 square + text on the ILI9341 | 1 | T1 | Claude | done | [#2](https://github.com/Naaafis/Tamagotchi-ESP/pull/2) |
+| T3 | Buttons bring-up: show which of A/B/C was pressed (keypad, pull-ups) | 1 | T2 | Claude | in progress | `task/T3-T4-buttons-backlight` |
+| T4 | Backlight PWM on GPIO 7 with fade up/down | 1 | T2 | Claude | in progress | `task/T3-T4-buttons-backlight` |
 | T5 | Audio bring-up: MAX98357A beep and short wav | 1 | T1 | | todo | |
 | T6 | Desktop simulator: same game code in a pygame window, keys A/S/D | 2 | T0 | Claude | review | [#3](https://github.com/Naaafis/Tamagotchi-ESP/pull/3) |
 | T7 | Game core: stats, decay, needs (eat, sleep, play, drink, treat, affection), attention logic, no permanent death | 3 | T0 | Claude | review | [#3](https://github.com/Naaafis/Tamagotchi-ESP/pull/3) |
