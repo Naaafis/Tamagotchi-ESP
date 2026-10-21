@@ -10,8 +10,8 @@ Status: `todo` · `in progress` · `review` · `blocked` · `done`
 | T3 | Buttons bring-up: show which of A/B/C was pressed (keypad, pull-ups) | 1 | T2 | | todo | |
 | T4 | Backlight PWM on GPIO 7 with fade up/down | 1 | T2 | | todo | |
 | T5 | Audio bring-up: MAX98357A beep and short wav | 1 | T1 | | todo | |
-| T6 | Desktop simulator: same game code in a pygame window, keys A/S/D | 2 | T0 | | todo | |
-| T7 | Game core: stats, decay, needs (eat, sleep, play, drink, treat, affection), attention logic, no permanent death | 3 | T0 | | todo | |
+| T6 | Desktop simulator: same game code in a pygame window, keys A/S/D | 2 | T0 | Claude | review | `task/T6-T7-sim-and-core` |
+| T7 | Game core: stats, decay, needs (eat, sleep, play, drink, treat, affection), attention logic, no permanent death | 3 | T0 | Claude | review | `task/T6-T7-sim-and-core` |
 | T8 | Menu + input: Tamagotchi icon rows, A cycles / B selects / C cancels | 3 | T7 | | todo | |
 | T9 | Reference photos of Christina's Tamagotchi into `docs/reference/` | 4 | — | Nafis | todo | — |
 | T10 | Art: pet sprites (idle, happy, sad, sleep, eat) + icons for every need, 240×240 layout | 4 | T8, T9 | | todo | |
