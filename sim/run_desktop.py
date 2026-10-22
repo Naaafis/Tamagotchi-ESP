@@ -25,10 +25,59 @@ REPO = os.path.dirname(HERE)
 # Appended, not prepended: firmware/code.py must not shadow the stdlib `code` module.
 sys.path.append(os.path.join(REPO, "firmware"))
 
+import busdisplay  # noqa: E402
+import pygame  # noqa: E402
+import blinka_displayio_pygamedisplay as pgd  # noqa: E402
+
+from pet.game import Game  # noqa: E402
+
 WIDTH = 320
 HEIGHT = 240
+FRAME_RATE = 30  # window redraws per second; the real panel refreshes at about this rate
 PRESS_INTERVAL = 0.4
 STATUS_INTERVAL = 1.0
+
+
+class SimDisplay(pgd.PyGameDisplay):
+    """A 320x240 displayio display that is drawn on the main thread.
+
+    The stock PyGameDisplay refreshes from displayio's background thread: it
+    posts one pygame event, sets a "refresh pending" flag, and leaves the real
+    drawing to whoever pumps the event on the main thread. If that one event
+    is lost (pygame's set_blocked() flushes the queue, for one) the flag never
+    clears, no second event is ever posted, and the window stays black for
+    good. That is what happened on macOS. So auto_refresh is off here and the
+    sim calls refresh() itself once per frame, which draws right there.
+
+    The group is rendered at the panel's native 320x240 into an offscreen
+    surface and scaled to the window by pygame. Drawing a 3x-scaled group
+    through displayio's pure-Python rasteriser costs 220 ms a frame; this
+    costs 25 ms for a full frame and almost nothing while the pet idles,
+    because only the areas displayio marks dirty are redrawn.
+    """
+
+    def __init__(self, scale, caption):
+        self._scale = scale
+        self._window = None
+        super().__init__(width=WIDTH, height=HEIGHT, caption=caption, auto_refresh=False)
+
+    def _initialize(self, init_sequence):
+        pygame.init()
+        pygame.display.set_caption(self._caption)
+        self._window = pygame.display.set_mode((self.width * self._scale, self.height * self._scale))
+        # PyGameDisplay._refresh_area() blits each redrawn area into this.
+        self._pygame_screen = pygame.Surface((self.width, self.height))
+
+    def _get_refresh_areas(self):
+        # PyGameDisplay always redraws the whole display; BusDisplay asks the
+        # group what changed.
+        return busdisplay.BusDisplay._get_refresh_areas(self)
+
+    def _refresh_display(self):
+        # Not PyGameDisplay._refresh_display(): that flips before we scale.
+        busdisplay.BusDisplay._refresh_display(self)
+        self._window.blit(pygame.transform.scale(self._pygame_screen, self._window.get_size()), (0, 0))
+        pygame.display.flip()
 
 
 def parse_args():
@@ -46,59 +95,43 @@ def main():
     if args.headless:
         os.environ["SDL_VIDEODRIVER"] = "dummy"
 
-    import pygame
-    import displayio
-    import blinka_displayio_pygamedisplay as pgd
-
-    from pet.game import Game
-
     keys = {pygame.K_a: "A", pygame.K_s: "B", pygame.K_d: "C"}
     scripted = [p.strip().upper() for p in args.press.split(",") if p.strip()]
 
-    display = pgd.PyGameDisplay(
-        width=WIDTH * args.scale,
-        height=HEIGHT * args.scale,
-        caption="Tamagotchi sim  (A/S/D = buttons A/B/C)",
-        native_frames_per_second=30,
-    )
-
-    # Only the events we and the display driver read may enter the queue;
-    # otherwise mouse motion piles up behind the driver's refresh events.
-    wanted = [pygame.QUIT, pygame.WINDOWCLOSE, pygame.KEYDOWN] + pgd._PYGAME_REDRAW_EVENTS
-    wanted.append(pgd._DISPLAYIO_EVENT)
-    pygame.event.set_blocked(None)
-    pygame.event.set_allowed(wanted)
+    display = SimDisplay(args.scale, "Tamagotchi sim  (A/S/D = buttons A/B/C)")
 
     start = time.monotonic()
     game = Game(now=start, width=WIDTH, height=HEIGHT)
     game.on_attention = lambda: print("[%6.1fs] attention: %s" % (time.monotonic() - start, game.pet.summary()))
     game.on_button = lambda name: print("[%6.1fs] button %s" % (time.monotonic() - start, name))
 
-    # The game draws at 320x240; scale the whole thing up for the window.
-    root = displayio.Group(scale=args.scale)
-    root.append(game.root_group)
-    display.root_group = root
+    # Same as firmware/code.py on the board; the scaling is pygame's, not displayio's.
+    display.root_group = game.root_group
 
     next_status = start
     next_press = start + PRESS_INTERVAL
+    next_frame = start
     running = True
     while running:
-        if display.check_quit(0):  # handles refresh + window close
-            running = False
-            break
         now = time.monotonic()
         events = []
-        for event in pygame.event.get(eventtype=pygame.KEYDOWN):
-            if event.key == pygame.K_ESCAPE:
+        for event in pygame.event.get():
+            if event.type in (pygame.QUIT, pygame.WINDOWCLOSE):
                 running = False
-            elif event.key in keys:
-                events.append(keys[event.key])
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    running = False
+                elif event.key in keys:
+                    events.append(keys[event.key])
         if scripted and now >= next_press:
             events.append(scripted.pop(0))
             next_press = now + PRESS_INTERVAL
 
         game.update(now, events)
 
+        if now >= next_frame:
+            next_frame = now + 1 / FRAME_RATE
+            display.refresh()
         if now >= next_status:
             next_status = now + STATUS_INTERVAL
             pygame.display.set_caption("Tamagotchi sim  A/S/D = A/B/C   |   " + game.pet.summary())
@@ -106,7 +139,7 @@ def main():
             running = False
         time.sleep(1 / 60)
 
-    if args.screenshot and pygame.display.get_init():
+    if args.screenshot:
         display.refresh()
         pygame.image.save(pygame.display.get_surface(), args.screenshot)
         print("saved", args.screenshot)
