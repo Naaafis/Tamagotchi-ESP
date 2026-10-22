@@ -1,0 +1,12 @@
+# Desktop simulator + tests. Verified together on macOS, Python 3.11/3.12.
+# blinka-displayio-pygamedisplay 4.x is written against adafruit-blinka-displayio
+# 2.x (the 1.0 warning in its README is about older 2.x releases of the display
+# package); this pair works, so both are pinned.
+blinka-displayio-pygamedisplay==4.0.1
+adafruit-blinka-displayio==2.7.1
+pygame==2.6.1
+numpy>=2,<3
+# Same libraries circup installs on the board, for code that uses text later.
+adafruit-circuitpython-display-text==5.0.6
+adafruit-circuitpython-bitmap-font==2.5.1
+pytest>=8
