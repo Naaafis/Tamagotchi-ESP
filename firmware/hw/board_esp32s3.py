@@ -94,10 +94,12 @@ def get_keys():
 def button_events():
     """Drain pending button events.
 
-    Returns a list of (name, pressed) tuples in the order they happened, where
-    name is "A", "B" or "C" and pressed is True for a press, False for a
-    release. Empty list if nothing happened. Call this every loop iteration;
-    the queue holds 64 events and drops the oldest when full.
+    Returns a list of (name, pressed, ticks) tuples in the order they happened,
+    where name is "A", "B" or "C", pressed is True for a press and False for a
+    release, and ticks is the ticks_ms() reading when the scanner saw the
+    change (subtract with ticks_diff). Empty list if nothing happened. Call
+    this every loop iteration; the queue holds 64 events and drops the oldest
+    when full.
     """
     keys = get_keys()
     events = []
@@ -105,7 +107,7 @@ def button_events():
         event = keys.events.get()
         if event is None:
             return events
-        events.append((BUTTON_NAMES[event.key_number], event.pressed))
+        events.append((BUTTON_NAMES[event.key_number], event.pressed, event.timestamp))
 
 
 # ---- Backlight --------------------------------------------------------------
