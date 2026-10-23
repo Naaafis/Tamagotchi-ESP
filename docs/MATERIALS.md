@@ -13,7 +13,7 @@ Status key: **Have** = in hand, **Ordered** = on the way, **Confirm** = not sure
 | 12mm tactile buttons with caps, 5 colors incl. yellow | [B0F4PV69N5](https://www.amazon.com/dp/B0F4PV69N5) | 3 (25-pack) | Confirm | Yellow caps to match the original. |
 | Female-to-female jumpers, 50cm | — | ~15 | Have | Bag-to-chest and bag-to-belly runs. Don't chain jumpers; every joint can pop loose. |
 | Female-to-female jumpers, 30cm | [B0FJXZZM83](https://www.amazon.com/dp/B0FJXZZM83) | some | Confirm | Short runs inside the bag (amp, power). |
-| USB power bank, slim 10,000 mAh (e.g. Anker PowerCore Slim 10K) | [search](https://www.amazon.com/s?k=Anker+PowerCore+Slim+10000) | 1 | Confirm | ESP32-S3 draw is low; 10K mAh lasts all night with margin. |
+| INIU 10,000 mAh slim power bank with detachable cable | [B0DFLGW8MF](https://www.amazon.com/dp/B0DFLGW8MF) | 1 | Ordered | Test 30 min on the board for low-current auto-shutoff. ESP32-S3 draw is low; 10K mAh lasts all night with margin. |
 | USB-C cable, short (power bank to board) | — | 1 | Have? | Board and bank both live in the bag. |
 
 ## Securing and finishing
