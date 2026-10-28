@@ -15,22 +15,28 @@ Board: AYWHP ESP32-S3 (DevKitC-1 layout, N16R8). Pins are labeled by GPIO number
 | DC | GPIO 9 | |
 | SDI (MOSI) | GPIO 11 | |
 | SCK | GPIO 12 | |
-| LED | 3V3 (bring-up) → GPIO 7 (PWM dimming) | Start on 3V3. Move to GPIO 7 once the screen works, then dim in software. Check the board has a transistor on LED before driving from GPIO. |
+| LED | GPIO 7 | PWM dimming in software (`Backlight` in `firmware/hw/board_esp32s3.py`). |
 | SDO (MISO) | not connected | Only for reading from the screen. |
 | T_CLK, T_CS, T_DIN, T_DO, T_IRQ | not connected | Touch layer, unused. |
 
+A right-angle female header adapter sits on the screen's pin header and the jumpers plug into it, so they leave the panel at 90° (along the back of the board) instead of sticking straight out.
+
 Over the 50cm run: start with SPI at ~24 MHz. If you see garbage, drop to 10-20 MHz. Run a GND wire alongside SCK in the bundle.
 
-## Buttons
+## Buttons: 1×3 membrane keypad
 
-Each button: one leg to its GPIO, the other leg to a **shared GND** wire. Internal pull-ups are enabled in software (`keypad.Keys(..., value_when_pressed=False, pull=True)`), so no resistors.
+JESSINIE MG001V, three keys on a 4-pin 2.54 mm plug: one common pin and one pin per key. A press connects that key's pin to the common. The common goes to GND and each key pin to a GPIO with the internal pull-up on (`keypad.Keys(..., value_when_pressed=False, pull=True)`), so no resistors.
 
-| Button | Role | ESP32-S3 |
+| Plug pin | ESP32-S3 | |
 |---|---|---|
-| A (left) | Cycle icons | GPIO 4 |
-| B (middle) | Select | GPIO 5 |
-| C (right) | Cancel / back | GPIO 6 |
-| Shared | Ground | GND |
+| 1 | GND | common |
+| 2 | GPIO 4 | key |
+| 3 | GPIO 5 | key |
+| 4 | GPIO 6 | key |
+
+Which end of the plug is the common is not printed on the keypad. If no key registers, or only one does (as C), the plug is the other way round: flip it so the other end goes to GND.
+
+Roles: A (left) cycles icons, B (middle) selects, C (right) cancels. Which GPIO each physical key lands on is set in firmware (`BUTTON_PINS` in `firmware/hw/board_esp32s3.py`), so a different key order is fixed there, not by rewiring.
 
 Total wires to the belly: 4.
 

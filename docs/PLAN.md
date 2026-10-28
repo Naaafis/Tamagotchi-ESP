@@ -14,7 +14,7 @@ Christina goes as a Tamagotchi for Halloween. A screen on her chest shows a pixe
 | Board | ESP32-S3 (AYWHP, N16R8 module) | Already owned, no soldering, instant boot, safe to pull power, low draw. Pi Zero is the backup. |
 | Language | CircuitPython | Python, no compile/flash loop (save `code.py` and it reloads), good display/button/audio libraries. |
 | Screen | HiLetgo 2.8" ILI9341 SPI, 320×240, LED backlit | No 2-3" square SPI panel exists. We render into a **centered 240×240 square** and black out the sides; the costume bezel hides them. |
-| Buttons | 3× 12mm tactile, yellow caps | A = cycle icons, B = select, C = cancel (same as the real toy). |
+| Buttons | 1×3 membrane keypad (JESSINIE MG001V) | A = cycle icons, B = select, C = cancel (same as the real toy). Replaced the 12mm tactile buttons. |
 | Sound | MAX98357A I2S amp + 4Ω 3W 40mm speaker | Board can't drive a speaker directly. Fallback: piezo buzzer on one GPIO. |
 | Placement | Screen on chest, buttons on belly, **board + amp + battery in a small bag on her back** | 50cm jumpers run over the shoulder. Lower SPI clock if the screen glitches over the long run. |
 | Base code | Write our own game in CircuitPython, borrowing structure and art ideas from reference repos | No existing repo targets this screen + 3 buttons + custom needs. See [REFERENCES.md](REFERENCES.md). |
