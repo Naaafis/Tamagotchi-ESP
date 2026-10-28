@@ -27,16 +27,16 @@ Over the 50cm run: start with SPI at ~24 MHz. If you see garbage, drop to 10-20 
 
 JESSINIE MG001V, three keys on a 4-pin 2.54 mm plug: one common pin and one pin per key. A press connects that key's pin to the common. The common goes to GND and each key pin to a GPIO with the internal pull-up on (`keypad.Keys(..., value_when_pressed=False, pull=True)`), so no resistors.
 
-| Plug pin | ESP32-S3 | |
-|---|---|---|
-| 1 | GND | common |
-| 2 | GPIO 4 | key |
-| 3 | GPIO 5 | key |
-| 4 | GPIO 6 | key |
+| Plug pin | ESP32-S3 | Physical key | Button |
+|---|---|---|---|
+| 1 | GND | common | |
+| 2 | GPIO 4 | middle | B (select) |
+| 3 | GPIO 5 | right | C (cancel / back) |
+| 4 | GPIO 6 | left | A (cycle icons) |
 
-Which end of the plug is the common is not printed on the keypad. If no key registers, or only one does (as C), the plug is the other way round: flip it so the other end goes to GND.
+Pin 1 is the common: confirmed on the board, all three keys register with it on GND. If the plug is ever reversed, no key or only one key registers.
 
-Roles: A (left) cycles icons, B (middle) selects, C (right) cancels. Which GPIO each physical key lands on is set in firmware (`BUTTON_PINS` in `firmware/hw/board_esp32s3.py`), so a different key order is fixed there, not by rewiring.
+The plug's key pins are not in left-to-right order. The firmware maps them (`BUTTON_PINS` in `firmware/hw/board_esp32s3.py`) so physical left/middle/right are A/B/C. If the order is ever wrong again, change it there instead of rewiring.
 
 Total wires to the belly: 4.
 

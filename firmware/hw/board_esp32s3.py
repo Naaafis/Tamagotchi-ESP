@@ -3,8 +3,8 @@
 Screen: HiLetgo 2.8" ILI9341, 320x240, SPI.
   SCK  -> IO12    MOSI -> IO11    CS -> IO10
   DC   -> IO9     RST  -> IO8     LED -> IO7 (PWM backlight)
-Buttons: one leg to the GPIO, the other to a shared GND. Internal pull-ups.
-  A -> IO4        B -> IO5        C -> IO6
+Buttons: 1x3 membrane keypad, common on GND, one GPIO per key. Internal pull-ups.
+  A (left) -> IO6   B (middle) -> IO4   C (right) -> IO5
 """
 
 import board
@@ -42,7 +42,13 @@ BACKLIGHT_INITIAL = 1.0  # start fully on so the screen is visible while testing
 
 # ---- Pins -------------------------------------------------------------------
 
-BUTTON_PINS = (board.IO4, board.IO5, board.IO6)
+# Which GPIO each physical key of the membrane keypad lands on (plug pin 1 is
+# the common, on GND). The plug's key pins are not in left-to-right order, so
+# the order is fixed here rather than by rewiring:
+#   left key   -> plug pin 4 -> IO6 -> A (cycle)
+#   middle key -> plug pin 2 -> IO4 -> B (select)
+#   right key  -> plug pin 3 -> IO5 -> C (cancel)
+BUTTON_PINS = (board.IO6, board.IO4, board.IO5)
 BUTTON_NAMES = ("A", "B", "C")
 BACKLIGHT_PIN = board.IO7
 

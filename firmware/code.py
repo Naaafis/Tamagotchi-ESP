@@ -135,7 +135,7 @@ game.on_attention = on_attention
 # ---- Main loop --------------------------------------------------------------
 
 log(
-    "T8 OK: game on %dx%d, buttons A/B/C on IO4/IO5/IO6, backlight %d%% -> %d%% after %gs idle"
+    "T8 OK: game on %dx%d, buttons A/B/C on IO6/IO4/IO5, backlight %d%% -> %d%% after %gs idle"
     % (WIDTH, HEIGHT, int(BRIGHT_LEVEL * 100), int(RESTING_LEVEL * 100), IDLE_SECONDS)
 )
 log("pet: " + game.pet.summary())
