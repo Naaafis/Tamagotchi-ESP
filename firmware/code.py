@@ -5,12 +5,19 @@ into Game.update(). The backlight comes up to BRIGHT_LEVEL on every press and
 whenever the pet starts asking for attention, then fades down to RESTING_LEVEL
 after IDLE_SECONDS without a press.
 
+Sound (pet.sound, played through the MAX98357A by hw.board_esp32s3.Audio): a
+tick on every press, a three-beep chirp when the pet starts asking for
+attention and again every pet.sound.REMINDER_SECONDS while it keeps asking, a
+jingle when a care action is done, a low sad tune when it starts sulking, and
+a short hello at power-on. The tunes themselves are in pet/sound.py.
+
 Serial prints every press and release stamped with the keypad scanner's own
 time, with the hold time and the gap since that button's last release (a
-bounce shows up as a few-ms hold or gap), every attention event,
-any loop iteration slower than SLOW_FRAME_MS, and a status line every
-STATUS_SECONDS with the pet's stats, the slowest frame and the longest gap
-between two frames (which includes the display's background refreshes).
+bounce shows up as a few-ms hold or gap), every attention event, action,
+sulk and sound (except the tick), any loop iteration slower than
+SLOW_FRAME_MS, and a status line every STATUS_SECONDS with the pet's stats,
+the slowest frame and the longest gap between two frames (which includes the
+display's background refreshes).
 """
 
 import gc
@@ -20,15 +27,20 @@ from hw.board_esp32s3 import (
     HEIGHT,
     WIDTH,
     button_events,
+    get_audio,
     get_backlight,
     get_display,
     get_keys,
     ticks_diff,
     ticks_ms,
 )
+from pet import sound
 from pet.game import Game
 
 # ---- Tuning knobs -----------------------------------------------------------
+
+VOLUME = 0.25  # speaker loudness, 0.0-1.0 (square-wave amplitude into the amp)
+MUTE = False  # True = no sound at all; everything else works the same
 
 RESTING_LEVEL = 0.15  # backlight while nobody is playing (0.0-1.0)
 BRIGHT_LEVEL = 1.00  # backlight after a press or when the pet asks for something
@@ -64,6 +76,10 @@ GC_INTERVAL_SECONDS = 300
 backlight = get_backlight()
 display = get_display()
 get_keys()  # start scanning now so a press during setup isn't lost
+audio = get_audio(VOLUME)
+for _tune in sound.TUNES:
+    audio.prepare(_tune)  # render every tune now (~100 ms) so no press waits for it
+sounds = sound.Sounds(audio, mute=MUTE)
 
 # The game clock: seconds since boot, built from ticks_ms() so it keeps
 # millisecond precision all night (time.monotonic() loses precision over time).
@@ -122,23 +138,45 @@ def brighten(reason):
 
 def on_button(name):
     brighten("button " + name)
+    sounds.button()
 
 
 def on_attention():
     log("attention: " + game.pet.summary())
     brighten("attention")
+    sounds.attention()
+
+
+def on_action(action):
+    log("action: " + action)
+    sounds.action()
+
+
+def on_sulk():
+    log("sulk: " + game.pet.summary())
+    sounds.sulk()
 
 
 game.on_button = on_button
 game.on_attention = on_attention
+game.on_action = on_action
+game.on_sulk = on_sulk
 
 # ---- Main loop --------------------------------------------------------------
 
 log(
-    "T8 OK: game on %dx%d, buttons A/B/C on IO6/IO4/IO5, backlight %d%% -> %d%% after %gs idle"
-    % (WIDTH, HEIGHT, int(BRIGHT_LEVEL * 100), int(RESTING_LEVEL * 100), IDLE_SECONDS)
+    "T11 OK: game on %dx%d, buttons A/B/C on IO6/IO4/IO5, backlight %d%% -> %d%% after %gs idle, sound %s"
+    % (
+        WIDTH,
+        HEIGHT,
+        int(BRIGHT_LEVEL * 100),
+        int(RESTING_LEVEL * 100),
+        IDLE_SECONDS,
+        "muted" if MUTE else "volume %g" % VOLUME,
+    )
 )
 log("pet: " + game.pet.summary())
+sounds.play(sound.STARTUP)
 
 _idle_ms = int(IDLE_SECONDS * 1000)
 _next_status_ms = STATUS_SECONDS * 1000
@@ -178,6 +216,9 @@ while True:
         log(text, ticks_to_clock(ticks))
 
     game.update(frame_start / 1000.0, presses)
+    tune = sounds.update(frame_start / 1000.0, game.pet.attention)
+    if tune is not None and tune != sound.TICK:
+        log("sound: %s (%d ms)" % (sound.name(tune), sound.duration_ms(tune)))
     _update_ms = clock_ms() - frame_start
 
     if backlight.target > RESTING_LEVEL and frame_start - _last_activity_ms >= _idle_ms:

@@ -102,3 +102,60 @@ def test_hooks_fire_on_button_and_on_attention_edge():
     assert attention == [True]
     g.update(3.0)
     assert attention == [True]  # once per edge, not once per frame
+
+
+def test_on_action_fires_for_care_actions_only():
+    g = game()
+    actions = []
+    g.on_action = actions.append
+    g.update(1.0, ["A", "B"])  # eat
+    assert actions == ["eat"]
+    g.update(2.0, ["B"])  # again: the cursor stays on eat
+    assert actions == ["eat", "eat"]
+    g.update(3.0, ["C", "B", "A", "C"])  # cancel, B with nothing highlighted, move, cancel
+    assert actions == ["eat", "eat"]
+    presses = ["A"] * (MENU_ITEMS.index("stats") + 1) + ["B"]
+    g.update(4.0, presses)
+    assert g.page == PAGE_STATS
+    assert actions == ["eat", "eat"]  # opening the stats page is not an action
+
+
+def test_on_action_fires_for_sleep_but_not_for_the_press_that_wakes():
+    g = game()
+    actions = []
+    g.on_action = actions.append
+    g.update(1.0, ["A"] * (MENU_ITEMS.index("sleep") + 1) + ["B"])
+    assert actions == ["sleep"]
+    assert g.pet.asleep
+    g.update(2.0, ["B"])  # wakes it; the menu doesn't see the press
+    assert not g.pet.asleep
+    assert actions == ["sleep"]
+
+
+def test_on_sulk_fires_once_when_a_stat_runs_out_and_again_after_recovery():
+    g = game()
+    sulks = []
+    g.on_sulk = lambda: sulks.append(True)
+    g.pet.stats["hunger"] = 0.001
+    g.update(1.0)
+    assert g.pet.sulking
+    assert sulks == [True]
+    g.pet.stats["thirst"] = 0.0
+    g.update(2.0)
+    assert sulks == [True]  # already sulking: a second empty stat doesn't re-fire
+    g.pet.stats["thirst"] = STAT_MAX
+    g.update(3.0, ["A", "B"])  # eat
+    assert not g.pet.sulking
+    g.pet.stats["fun"] = 0.0
+    g.update(4.0)
+    assert sulks == [True, True]
+
+
+def test_care_in_the_same_frame_a_stat_runs_out_is_not_a_sulk():
+    g = game()
+    sulks = []
+    g.on_sulk = lambda: sulks.append(True)
+    g.pet.stats["hunger"] = 0.001
+    g.update(1.0, ["A", "B"])  # hunger hits zero in tick(), then gets fed
+    assert not g.pet.sulking
+    assert sulks == []
