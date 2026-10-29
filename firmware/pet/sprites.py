@@ -4,11 +4,13 @@ Pure data, no displayio: ui.py turns these into bitmaps. Our own drawings in
 the style of the original's dot-matrix LCD. T10 can redraw any of it; keep
 the names and sizes and nothing else needs to change.
 
-Three sheets:
-    pet frames   16x16, drawn at 8x: the ghost in every pose
+Three 1-bit sheets:
+    pet frames   16x16, drawn at 8x: Sprout, the pet, in every pose
     icons        12x12, drawn at 4x: menu icons, attention, the want bubble
-    fx           8x8, drawn at 8x next to the pet: food, cup, treat, hearts,
-                 sparkles, Z's, the game's arrow and score digits
+    fx           8x8, drawn at 8x next to the pet: food, cup, hearts,
+                 sparkles, Z's, the flush wave, the UFO, the game's arrow
+                 and digits
+and the poop, 8x8 at 8x in colour (POOP, POOP_COLORS).
 """
 
 PET_SIZE = 16
@@ -17,89 +19,94 @@ FX_SIZE = 8
 
 _BLANK16 = "................"
 
-# A little ghost. Eyes and mouth are holes so they read in one colour.
+# Sprout: our own round critter in outline, the way the original's LCD pets
+# are drawn, with a leaf on top, dot eyes and stubby feet. Its feet stand on
+# row 13 in every standing pose.
 _IDLE0 = (
     "................",
+    "........##......",
+    ".......###......",
+    ".......#........",
     ".....######.....",
-    "...##########...",
-    "..############..",
-    ".##############.",
-    ".###..####..###.",
-    ".###..####..###.",
-    ".##############.",
-    ".##############.",
-    ".######..######.",
-    ".##############.",
-    ".##############.",
-    ".##############.",
-    ".##.####.####.#.",
+    "...##......##...",
+    "..#..##..##..#..",
+    "..#..##..##..#..",
+    "..#..........#..",
+    ".##..#....#..##.",
+    "..#...####...#..",
+    "...#........#...",
+    "....########....",
+    "....###..###....",
     "................",
     "................",
 )
 
-# Same ghost one row higher: alternating with _IDLE0 gives a bob.
-_IDLE1 = _IDLE0[1:] + (_BLANK16,)
+# Squashed one row (the empty row under the eyes goes), feet still down:
+# alternating with _IDLE0 it breathes.
+_IDLE1 = (_BLANK16,) + _IDLE0[:8] + _IDLE0[9:]
 
+# Eyes squeezed shut, mouth wide open, arms up.
 _HAPPY = (
     "................",
+    "........##......",
+    ".......###......",
+    ".......#........",
     ".....######.....",
-    "...##########...",
-    "..############..",
-    ".##############.",
-    ".###..####..###.",
-    ".##############.",
-    ".##############.",
-    ".##############.",
-    ".####......####.",
-    ".#####....#####.",
-    ".##############.",
-    ".##############.",
-    ".##.####.####.#.",
+    "...##......##...",
+    "..#..#....#..#..",
+    "..#.#.#..#.#.#..",
+    ".##..........##.",
+    "..#..######..#..",
+    "..#...#..#...#..",
+    "...#...##...#...",
+    "....########....",
+    "....###..###....",
     "................",
     "................",
 )
 
-# Same smile one row higher: alternating with _HAPPY is the happy hop. Hops
+# Same pose one row higher: alternating with _HAPPY is the happy hop. Hops
 # are drawn into the frame instead of moving the sprite: on the board moving a
 # 128x128 sprite redraws its old and new rectangles (118 ms), a frame swap
 # redraws one (50-60 ms).
 _HAPPY_UP = _HAPPY[1:] + (_BLANK16,)
 
+# Eyes low, a frown, arms hanging.
 _SAD = (
     "................",
+    "........##......",
+    ".......###......",
+    ".......#........",
     ".....######.....",
-    "...##########...",
-    "..############..",
-    ".##############.",
-    ".##############.",
-    ".###..####..###.",
-    ".###..####..###.",
-    ".###.##########.",
-    ".###.##########.",
-    ".######..######.",
-    ".####......####.",
-    ".##############.",
-    ".##.####.####.#.",
+    "...##......##...",
+    "..#..........#..",
+    "..#..##..##..#..",
+    "..#..##..##..#..",
+    "..#..........#..",
+    ".##...####...##.",
+    "...#.#....#.#...",
+    "....########....",
+    "....###..###....",
     "................",
     "................",
 )
 
-# Turned away: one eye at the edge, no mouth.
+# Looking away: one eye off to the side, no mouth, the leaf drooping.
 _SULK = (
     "................",
+    "................",
+    ".......#........",
+    ".....###........",
     ".....######.....",
-    "...##########...",
-    "..############..",
-    ".##############.",
-    ".#..############",
-    ".##############.",
-    ".##############.",
-    ".##############.",
-    ".##############.",
-    ".##############.",
-    ".##############.",
-    ".##############.",
-    ".##.####.####.#.",
+    "...##......##...",
+    "..#..........#..",
+    "..#.##.......#..",
+    "..#.##.......#..",
+    "..#..........#..",
+    ".##..........##.",
+    "...#........#...",
+    "....########....",
+    "....###..###....",
     "................",
     "................",
 )
@@ -107,88 +114,99 @@ _SULK = (
 # Side on, facing left (flip_x to face right): eats, and turns in the game.
 _SIDE = (
     "................",
-    "......######....",
-    "....##########..",
-    "...############.",
-    "..#############.",
-    "..#..##########.",
-    "..#..##########.",
-    ".##############.",
-    ".##############.",
-    "....###########.",
-    ".##############.",
-    "..#############.",
-    "..##############",
-    "...####.####..##",
+    ".........##.....",
+    "........###.....",
+    "........#.......",
+    ".....######.....",
+    "...##......##...",
+    "..#..........#..",
+    "..#.##.......#..",
+    "..#.##.......#..",
+    "..#..........##.",
+    "..###........#..",
+    "...#........#...",
+    "....########....",
+    "...###...###....",
     "................",
     "................",
 )
 
 # Side on with the mouth wide open: the bite.
-_SIDE_EAT = _SIDE[:8] + (
-    "....###########.",
-    "......#########.",
-    "....###########.",
-) + _SIDE[11:]
+_SIDE_EAT = _SIDE[:9] + (
+    "..###........##.",
+    "....#........#..",
+    "...##.......#...",
+) + _SIDE[12:]
 
 # Eyes to one side and a frown, the whole body one column over: shaking its
 # head "no". flip_x swings it to the other side.
 _NO = (
     "................",
+    ".......##.......",
+    "......###.......",
+    "......#.........",
     "....######......",
-    "..##########....",
-    ".############...",
-    "##############..",
-    "#..###..######..",
-    "#..###..######..",
-    "##############..",
-    "##############..",
-    "##############..",
-    "#####....#####..",
-    "####.####.####..",
-    "##############..",
-    "##.####.####.#..",
+    "..##......##....",
+    ".#.##..##...#...",
+    ".#.##..##...#...",
+    ".#..........#...",
+    "##..........##..",
+    ".#...####...#...",
+    "..#.#....#.#....",
+    "...########.....",
+    "...###..###.....",
     "................",
     "................",
 )
 
-# Eyes shut, mouth wide open.
+# Eyes shut, mouth a big O.
 _YAWN = (
     "................",
+    "........##......",
+    ".......###......",
+    ".......#........",
     ".....######.....",
-    "...##########...",
-    "..############..",
-    ".##############.",
-    ".##############.",
-    ".#...######...#.",
-    ".##############.",
-    ".#####....#####.",
-    ".####......####.",
-    ".####......####.",
-    ".#####....#####.",
-    ".##############.",
-    ".##.####.####.#.",
-    "................",
-    "................",
-)
-
-# Lying down, squashed flat on the floor.
-_LIE = (_BLANK16,) * 8 + (
+    "...##......##...",
+    "..#..........#..",
+    "..#.##....##.#..",
+    "..#....##....#..",
+    ".##...#..#...##.",
+    "..#...#..#...#..",
+    "...#...##...#...",
     "....########....",
-    "..############..",
-    ".###..####..###.",
-    ".###..####..###.",
-    "################",
-    "################",
-    ".##.####.####.#.",
+    "....###..###....",
+    "................",
     "................",
 )
 
-# Lying down, eyes shut: asleep.
+# Lying flat on the floor, the leaf flopped over to the left.
+_LIE = (_BLANK16,) * 6 + (
+    "...##...........",
+    ".....##.........",
+    "....########....",
+    "..##........##..",
+    ".#...##..##...#.",
+    ".#...##..##...#.",
+    ".#.....##.....#.",
+    "..############..",
+    "................",
+    "................",
+)
+
+# Lying flat, eyes shut: asleep.
 _LIE_SLEEP = _LIE[:10] + (
-    ".##############.",
-    ".#...######...#.",
+    ".#............#.",
+    ".#..###..###..#.",
 ) + _LIE[12:]
+
+# Beamed up into the UFO: lying, lifted two rows to the saucer's underside,
+# then shrunk to a speck just under it.
+_RISE1 = _LIE[2:] + (_BLANK16,) * 2
+_RISE2 = (_BLANK16,) * 7 + (
+    "......####......",
+    ".....#.##.#.....",
+    "......####......",
+) + (_BLANK16,) * 6
 
 # Frame order in the pet sprite sheet. ui.py looks frames up by name.
 PET_FRAMES = (
@@ -204,6 +222,8 @@ PET_FRAMES = (
     "yawn",
     "lie",
     "lie_sleep",
+    "rise1",
+    "rise2",
 )
 _PET_ART = {
     "idle0": _IDLE0,
@@ -218,6 +238,8 @@ _PET_ART = {
     "yawn": _YAWN,
     "lie": _LIE,
     "lie_sleep": _LIE_SLEEP,
+    "rise1": _RISE1,
+    "rise2": _RISE2,
 }
 
 _EAT = (  # burger
@@ -280,18 +302,18 @@ _PLAY = (  # ball
     "....####....",
 )
 
-_TREAT = (  # wrapped candy
+_CLEAN = (  # rubber duck: the flush
     "............",
-    "............",
-    "#...####...#",
-    "##.######.##",
+    "..###.......",
+    ".#####......",
+    ".#.###......",
+    "######....#.",
+    "..####...##.",
+    "..#########.",
     ".##########.",
-    ".##.####.##.",
-    ".##.####.##.",
     ".##########.",
-    "##.######.##",
-    "#...####...#",
-    "............",
+    "..########..",
+    "...######...",
     "............",
 )
 
@@ -342,13 +364,13 @@ _ATTENTION = (  # exclamation mark
 
 # Icon order in the icon sprite sheet. The first six are the menu actions and
 # double as the stat icons on the stats page.
-ICON_NAMES = ("eat", "drink", "sleep", "play", "treat", "affection", "stats", "attention")
+ICON_NAMES = ("eat", "drink", "sleep", "play", "clean", "affection", "stats", "attention")
 _ICON_ART = {
     "eat": _EAT,
     "drink": _DRINK,
     "sleep": _SLEEP,
     "play": _PLAY,
-    "treat": _TREAT,
+    "clean": _CLEAN,
     "affection": _AFFECTION,
     "stats": _STATS,
     "attention": _ATTENTION,
@@ -431,34 +453,14 @@ _FX_ART = {
         "..####..",
         "........",
     ),
-    "pumpkin0": (  # jack-o'-lantern candy
-        "...##...",
-        ".######.",
-        "########",
-        "#.####.#",
-        "########",
-        "#.#..#.#",
-        ".######.",
+    "wave": (  # the flush: two stacked make a column of water sweeping across
+        ".##..##.",
+        "#..##..#",
         "........",
-    ),
-    "pumpkin1": (
-        "...##...",
-        ".#####..",
-        "#####...",
-        "#.##....",
-        "#####...",
-        "#.#.#...",
-        ".#####..",
         "........",
-    ),
-    "pumpkin2": (
-        "...#....",
-        ".##.....",
-        "###.....",
-        "#.#.....",
-        "###.....",
-        "#.#.....",
-        ".##.....",
+        ".##..##.",
+        "#..##..#",
+        "........",
         "........",
     ),
     "heart": (
@@ -581,6 +583,49 @@ _FX_ART = {
         ".###....",
         "........",
     ),
+    # The UFO that takes the pet away: a 16-wide saucer as two tiles side by
+    # side (ufo_l at x, ufo_r at x + 8), the beam under its middle, and the
+    # tiny one left in the sky afterwards.
+    "ufo_l": (
+        "......##",
+        "....##..",
+        "...#....",
+        ".#######",
+        "#..#..#.",
+        ".#######",
+        "....####",
+        "........",
+    ),
+    "ufo_r": (
+        "##......",
+        "..##....",
+        "....#...",
+        "#######.",
+        ".#..#..#",
+        "#######.",
+        "####....",
+        "........",
+    ),
+    "beam": (
+        "...##...",
+        "..#..#..",
+        "..#..#..",
+        ".#....#.",
+        ".#....#.",
+        "#......#",
+        "#......#",
+        "#......#",
+    ),
+    "ufo_tiny": (
+        "........",
+        "...##...",
+        "..####..",
+        "########",
+        ".#.##.#.",
+        "..####..",
+        "........",
+        "........",
+    ),
     "slash": (
         "....#...",
         "....#...",
@@ -602,9 +647,7 @@ FX_NAMES = (
     "cup1",
     "cup2",
     "cup3",
-    "pumpkin0",
-    "pumpkin1",
-    "pumpkin2",
+    "wave",
     "heart",
     "sparkle0",
     "sparkle1",
@@ -618,6 +661,10 @@ FX_NAMES = (
     "d4",
     "d5",
     "slash",
+    "ufo_l",
+    "ufo_r",
+    "beam",
+    "ufo_tiny",
 )
 
 
@@ -655,3 +702,22 @@ def fx_sheet():
 
 def fx_index(name):
     return FX_NAMES.index(name)
+
+
+# ---- The poop: 8x8 at 8x, in colour -----------------------------------------
+# A chocolate-drop shape: a wide rounded base rising to a pointed tip, dark
+# brown with a glossy streak, and a thin white paper strip out of the top.
+# '.' is see-through; the other characters index POOP_COLORS.
+
+POOP = (
+    "...o....",
+    "...o....",
+    "...#....",
+    "..#+#...",
+    ".#+###..",
+    "#+#####.",
+    "#######.",
+    ".#####..",
+)
+POOP_CHARS = ".#+o"  # bitmap value = index here
+POOP_COLORS = (None, 0x4A2A12, 0x9A6638, 0xF4F4F4)  # see-through, brown, gloss, paper

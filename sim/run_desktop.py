@@ -3,7 +3,8 @@
 
     .venv/bin/python sim/run_desktop.py
 
-Keys: A / S / D are buttons A / B / C (hold D to leave the left/right game).
+Keys: A / S / D are buttons A / B / C. Hold D to leave the left/right game,
+S for 10 s to start a new pet, A for 3 s to make it poop now.
 Esc or closing the window quits.
 The window is the 320x240 screen scaled up (3x by default); everything
 outside the centered 240x240 square stays black, like the real panel.
@@ -139,9 +140,18 @@ def main():
 
     game.on_attention = on_attention
     game.on_button = on_button
+    def on_death():
+        print("[%6.1fs] died: %s" % (time.monotonic() - start, game.pet.summary()))
+
+    def on_reset():
+        print("[%6.1fs] reset: %s" % (time.monotonic() - start, game.pet.summary()))
+        sounds.play(sound.STARTUP)
+
     game.on_action = on_action
     game.on_cue = on_cue
     game.on_sulk = on_sulk
+    game.on_death = on_death
+    game.on_reset = on_reset
     sounds.play(sound.STARTUP)
 
     # Same as firmware/code.py on the board; the scaling is pygame's, not displayio's.

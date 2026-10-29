@@ -8,10 +8,12 @@ drawn outside it, and displayio paints uncovered pixels black.
 Layout (inside the square, Tamagotchi style):
     y   4.. 52   top icon row: eat, drink, sleep, play
     y  56..184   the stage, drawn at 8x: the pet (16x16 art) plus up to
-                 SLOT_COUNT 8x8 overlays (food, hearts, Z's, arrows, digits);
-                 the "I want" bubble sits top-right on the main screen
-    y 188..236   bottom icon row: treat, affection, stats, [attention]
-The stats page covers the middle with six bars when open.
+                 SLOT_COUNT 8x8 overlays (food, hearts, Z's, arrows, digits,
+                 the flush wave) and POOP_SLOTS colour poops; the "I want"
+                 bubble sits top-right on the main screen
+    y 188..236   bottom icon row: clean, affection, stats, [attention]
+The stats page covers the middle with six bars when open: the five stats and
+how clean it is.
 
 During an animation or the game the stage shows game.scene.frame (see
 pet.anim for the frame format); otherwise the pet's pose. Measured on the
@@ -25,6 +27,8 @@ import displayio
 
 from pet import anim, sprites
 from pet.state import (
+    CLEAN,
+    MAX_POOPS,
     POSE_HAPPY,
     POSE_IDLE,
     POSE_SAD,
@@ -54,6 +58,7 @@ MAX_MENU_ITEMS = ICONS_PER_ROW * 2 - 1  # last bottom slot is the attention icon
 STAGE_SCALE = 8
 STAGE_Y = (SQUARE - anim.STAGE_H * STAGE_SCALE) // 2  # 56
 SLOT_COUNT = anim.MAX_OVERLAYS
+POOP_SLOTS = anim.MAX_POOP_OVERLAYS
 
 BUBBLE_X = 186
 BUBBLE_Y = 58
@@ -84,6 +89,19 @@ def bitmap_from_rows(rows, width):
             if row[x] == "#":
                 bitmap[x, y] = 1
         y += 1
+    return bitmap
+
+
+def bitmap_from_art(rows, chars):
+    """Bitmap from text rows where each character's index in `chars` is its value."""
+    width = len(rows[0])
+    bitmap = displayio.Bitmap(width, len(rows), len(chars))
+    for y in range(len(rows)):
+        row = rows[y]
+        for x in range(width):
+            value = chars.index(row[x])
+            if value:
+                bitmap[x, y] = value
     return bitmap
 
 
@@ -175,6 +193,22 @@ class PetUI:
             slot.hidden = True
             self.stage.append(slot)
             self._slots.append(slot)
+        # Poops are in colour, so they get their own bitmap, palette and
+        # slots, under the fx slots (the flush wave passes over them). Lights
+        # off hides them, so the palette never needs the night theme.
+        poop_bitmap = bitmap_from_art(sprites.POOP, sprites.POOP_CHARS)
+        poop_palette = displayio.Palette(len(sprites.POOP_COLORS))
+        for i in range(len(sprites.POOP_COLORS)):
+            if sprites.POOP_COLORS[i] is None:
+                poop_palette.make_transparent(i)
+            else:
+                poop_palette[i] = sprites.POOP_COLORS[i]
+        self._poop_slots = []
+        for _ in range(POOP_SLOTS):
+            slot = displayio.TileGrid(poop_bitmap, pixel_shader=poop_palette)
+            slot.hidden = True
+            self.stage.insert(1, slot)  # right above the pet
+            self._poop_slots.append(slot)
         self.square.append(self.stage)
 
         # Bubble next to the pet: what it is getting, or what it wants.
@@ -187,10 +221,14 @@ class PetUI:
         # Stats page.
         self.page_group = displayio.Group()
         self._bars = []  # (bitmap, segments_shown) per stat
-        for i in range(len(STAT_NAMES)):
+        rows = []
+        for name in STAT_NAMES:
+            rows.append(STAT_ACTION[name])
+        rows.append(CLEAN)  # last row: how clean it is
+        for i in range(len(rows)):
             row_y = ROW_Y0 + ROW_PITCH * i
             icon_group = displayio.Group(scale=ROW_ICON_SCALE, x=ROW_ICON_X, y=row_y + 2)
-            icon_group.append(self._icon_grid(self._new_palette(), STAT_ACTION[STAT_NAMES[i]]))
+            icon_group.append(self._icon_grid(self._new_palette(), rows[i]))
             self.page_group.append(icon_group)
             bar = _frame_bitmap(BAR_W, BAR_H)
             bar_palette = self._new_palette(opaque=True)
@@ -211,6 +249,7 @@ class PetUI:
         self._pet_y = anim.HOME_Y
         self._pet_flip = False
         self._slot_shown = [None] * SLOT_COUNT  # overlay tuple per slot, None = hidden
+        self._poop_shown = [None] * POOP_SLOTS  # (x, y) per poop slot, None = hidden
         self._pet_index = {}
         for name in sprites.PET_FRAMES:
             self._pet_index[name] = sprites.pet_frame_index(name)
@@ -304,8 +343,31 @@ class PetUI:
             self._pet_flip = flip
 
     def _show_overlays(self, overlays):
-        """Put each (name, x, y, flip) in a slot, in order; hide the slots left over."""
-        count = len(overlays)
+        """Put each (name, x, y, flip) in a slot, in order; hide the slots left over.
+
+        Poops go to the poop slots, everything else to the fx slots.
+        """
+        fx = []
+        poops = []
+        for o in overlays:
+            if o[0] == anim.POOP:
+                poops.append((o[1], o[2]))
+            else:
+                fx.append(o)
+        for i in range(POOP_SLOTS):
+            want = poops[i] if i < len(poops) else None
+            if want == self._poop_shown[i]:
+                continue
+            slot = self._poop_slots[i]
+            if want is None:
+                slot.hidden = True
+            else:
+                slot.x = want[0]
+                slot.y = want[1]
+                slot.hidden = False
+            self._poop_shown[i] = want
+        count = len(fx)
+        overlays = fx
         for i in range(SLOT_COUNT):
             want = overlays[i] if i < count else None
             shown = self._slot_shown[i]
@@ -328,8 +390,12 @@ class PetUI:
             self._slot_shown[i] = want
 
     def _update_bars(self, pet):
-        for i in range(len(STAT_NAMES)):
-            segments = int(pet.stats[STAT_NAMES[i]] * BAR_SEGMENTS / STAT_MAX + 0.5)
+        for i in range(len(self._bars)):
+            if i < len(STAT_NAMES):
+                fraction = pet.stats[STAT_NAMES[i]] / STAT_MAX
+            else:  # cleanliness: full with no poops, empty with MAX_POOPS
+                fraction = (MAX_POOPS - pet.poops) / MAX_POOPS
+            segments = int(fraction * BAR_SEGMENTS + 0.5)
             entry = self._bars[i]
             if segments == entry[1]:
                 continue
@@ -375,14 +441,19 @@ class PetUI:
             f = scene.frame
             self._show_pet(f[anim.PET], f[anim.X], f[anim.Y], f[anim.FLIP])
             self._show_overlays(f[anim.OVERLAYS])
-        elif pet.asleep:  # lights off
+        elif pet.dead:  # taken away by the UFO
+            self._show_pet(None, anim.HOME_X, anim.HOME_Y, False)
+            self._show_overlays(anim.GONE)
+        elif pet.asleep:  # lights off; the poops are there but it's dark
             self._show_pet("lie_sleep", anim.LIE_X, anim.HOME_Y, False)
             self._show_overlays(anim.SLEEPING[int(now / anim.Z_SECONDS) % len(anim.SLEEPING)])
         else:
-            self._show_pet(self._pose_frame(pet, now), anim.HOME_X, anim.HOME_Y, False)
-            self._show_overlays(())
+            x = anim.POOP_PET_X if pet.poops else anim.HOME_X
+            self._show_pet(self._pose_frame(pet, now), x, anim.HOME_Y, False)
+            self._show_overlays(anim.POOP_PILE[: pet.poops])
 
-        if scene is not None or pet.asleep:
+        # The fourth poop sits where the bubble goes.
+        if scene is not None or pet.asleep or pet.dead or pet.poops >= MAX_POOPS:
             bubble = None
         elif pet.reaction is not None:
             bubble = pet.reaction

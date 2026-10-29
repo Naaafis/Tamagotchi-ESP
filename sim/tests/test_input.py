@@ -45,7 +45,7 @@ def test_menu_lists_every_action_plus_stats():
     assert "stats" in MENU_ITEMS
     for item in MENU_ITEMS:
         if item != "stats":
-            assert item in ("eat", "drink", "sleep", "play", "treat", "affection")
+            assert item in ("eat", "drink", "sleep", "play", "clean", "affection")
 
 
 def test_selecting_an_icon_performs_the_action():

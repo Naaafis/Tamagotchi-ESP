@@ -164,11 +164,24 @@ def on_sulk():
     sounds.sulk()
 
 
+def on_death():
+    log("died: " + game.pet.summary())
+    brighten("died")
+
+
+def on_reset():
+    log("reset: new pet: " + game.pet.summary())
+    brighten("reset")
+    sounds.play(sound.STARTUP)
+
+
 game.on_button = on_button
 game.on_attention = on_attention
 game.on_action = on_action
 game.on_cue = on_cue
 game.on_sulk = on_sulk
+game.on_death = on_death
+game.on_reset = on_reset
 
 # ---- Main loop --------------------------------------------------------------
 
@@ -194,7 +207,7 @@ _slow_frames = 0
 _longest_gap_ms = 0
 _prev_frame_start = None
 _down_ticks = {}  # button name -> ticks when it went down
-_held = []  # buttons down right now (holding C leaves the game)
+_held = []  # buttons down right now (holds: C leaves the game, B resets, A poops)
 _lights_were_off = False
 _release_ticks = {}  # button name -> ticks of its last release
 _gc_idle_ms = GC_IDLE_SECONDS * 1000

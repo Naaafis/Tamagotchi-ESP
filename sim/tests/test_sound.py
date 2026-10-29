@@ -69,11 +69,13 @@ def test_every_cue_the_animations_use_has_a_tune():
 
     used = set()
     frame_sets = list(anim.ACTIONS.values()) + list(anim.REFUSALS.values())
+    frame_sets += [anim.clean_frames(1), anim.DIE]
     frame_sets += [minigame.MATCH, minigame.MISS, minigame.WIN, minigame.LOSE]
     for frames in frame_sets:
         for f in frames:
             if f[anim.CUE] is not None:
                 used.add(f[anim.CUE])
+    used.add("plop")  # the game's own cue when a poop appears
     assert used == set(CUES)
     for tune in CUES.values():
         assert tune in TUNES

@@ -29,8 +29,17 @@ CHIRP = ((3136, 60), (0, 50), (3136, 60), (0, 50), (3136, 60))
 # rising major arpeggio (G6 B6 D7 G7).
 HAPPY = ((1568, 70), (0, 20), (1976, 70), (0, 20), (2349, 70), (0, 20), (3136, 160))
 
-# Each bite of food or a treat, and each sip.
+# Each bite and each sip.
 BLIP = ((1760, 40),)
+
+# A poop appears: a short drop in pitch.
+PLOP = ((1175, 30), (0, 15), (587, 80))
+
+# The flush: swirling down, then back up into the hop.
+FLUSH = ((2093, 50), (1568, 50), (1319, 50), (1047, 70), (0, 40), (1568, 60), (2093, 60), (3136, 140))
+
+# It died: slow, low and falling.
+DIE = ((392, 250), (0, 50), (349, 250), (0, 50), (330, 250), (0, 50), (262, 600))
 
 # The pet refuses food or drink: a falling "uh-uh".
 REFUSE = ((523, 110), (0, 50), (392, 160))
@@ -46,12 +55,15 @@ SAD = ((392, 200), (0, 40), (311, 200), (0, 40), (262, 500))
 # Power-on: a short two-note hello, so you can tell the sound works.
 STARTUP = ((2093, 60), (0, 30), (3136, 90))
 
-TUNES = (TICK, CHIRP, HAPPY, BLIP, REFUSE, MATCH, MISS, SAD, STARTUP)
+TUNES = (TICK, CHIRP, HAPPY, BLIP, PLOP, FLUSH, REFUSE, MATCH, MISS, SAD, DIE, STARTUP)
 NAMES = {
     TICK: "tick",
     CHIRP: "chirp",
     HAPPY: "happy",
     BLIP: "blip",
+    PLOP: "plop",
+    FLUSH: "flush",
+    DIE: "die",
     REFUSE: "refuse",
     MATCH: "match",
     MISS: "miss",
@@ -59,10 +71,13 @@ NAMES = {
     STARTUP: "startup",
 }
 
-# The tune for each animation cue (pet.anim, pet.minigame).
+# The tune for each cue (pet.anim, pet.minigame, and the game's "plop").
 CUES = {
     "bite": BLIP,
     "sip": BLIP,
+    "plop": PLOP,
+    "flush": FLUSH,
+    "die": DIE,
     "refuse": REFUSE,
     "happy": HAPPY,
     "match": MATCH,

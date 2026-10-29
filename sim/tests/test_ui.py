@@ -105,6 +105,8 @@ def all_frames():
             frames.extend(minigame.reveal_frames(guess, turn))
     for score in range(minigame.ROUNDS + 1):
         frames.extend(minigame.score_frames(score))
+    frames.extend(anim.DIE)
+    frames.append(anim.frame(0, None, overlays=anim.GONE))
     return frames
 
 
@@ -132,3 +134,38 @@ def test_every_animation_and_game_frame_renders():
             else:
                 assert slot.hidden
         now += 0.1
+
+
+def test_poops_show_in_their_own_slots_and_the_sweep_wipes_them():
+    g = Game(now=0.0)
+    ui = g.ui
+    for _ in range(2):
+        g.pet.poop(0.0)
+    g.update(0.1)
+    assert ui._pet_x == anim.POOP_PET_X
+    assert ui._poop_shown == [(x, y) for _n, x, y, _f in anim.POOP_PILE[:2]] + [None] * (len(ui._poop_slots) - 2)
+    for i in range(2):
+        assert not ui._poop_slots[i].hidden
+    for _ in range(2):
+        g.pet.poop(0.0)
+    g.update(0.2)
+    assert ui._bubble_group.hidden  # a full pile: no room for the bubble
+    frames = anim.clean_frames(4)
+    for f in frames:
+        g.scene = Fixed(f)
+        g.update(0.3)
+        poops = [o for o in f[anim.OVERLAYS] if o[0] == "poop"]
+        shown = [p for p in ui._poop_shown if p is not None]
+        assert shown == [(x, y) for _name, x, y, _flip in poops]
+    assert all(s.hidden for s in ui._poop_slots)  # gone by the end of the sweep
+    assert ui._poop_shown == [None] * len(ui._poop_slots)
+
+
+def test_dead_pet_shows_the_empty_sky():
+    g = Game(now=0.0)
+    ui = g.ui
+    g.pet.dead = True
+    g.update(0.1)
+    assert ui._pet_grid.hidden
+    assert ui._slot_shown[0][0] == "ufo_tiny"
+    assert ui._bubble_group.hidden

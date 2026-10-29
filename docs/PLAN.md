@@ -25,12 +25,14 @@ Christina goes as a Tamagotchi for Halloween. A screen on her chest shows a pixe
 - **Needs (custom, replacing standard prompts):**
   - Eat, sleep, play (standard)
   - **Drink**
-  - **Treat** (trick-or-treat, Halloween tie-in)
   - **Affection**
+  - **Clean**: the pet poops now and then (more after eating or drinking), up to four piles beside it; Clean sweeps them away with a wave. While it's dirty, fun and affection drain faster. (Treat was dropped for this.)
   - Maybe: "change the song", "outfit change"
 - **Attention:** when a need is low, the attention icon lights, the speaker beeps, and the backlight brightens.
 - **Backlight:** on by default at low brightness (~10-15%), brightens on events and button presses, then fades back.
-- **Speed:** stats should decay fast enough that people at a party see the pet ask for things every few minutes. Must not die during a party (floor the stats, or make "death" a recoverable sulk).
+- **Speed:** stats should decay fast enough that people at a party see the pet ask for things every few minutes (`DECAY_SCALE` at the top of `pet/state.py`: first ask ~8 min, a poop every ~6-10 min).
+- **Death:** neglect kills it. Once a stat hits zero it sulks; left sulking ~10 minutes, a UFO takes it away. Holding the middle button 10 s starts a new pet anytime, dead or alive. (Holding left 3 s makes it poop now, for testing.)
+- **Pet art:** our own 1-bit drawings in the original's style (Sprout, a round critter with a leaf on top). No Bandai characters or sprites.
 - **Reference:** Christina's physical Tamagotchi. Photograph its screens for layout and icon reference.
 
 ## Architecture
