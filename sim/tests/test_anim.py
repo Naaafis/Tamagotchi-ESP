@@ -39,7 +39,7 @@ def row_has_ink(row):
 
 def fx_rows(name):
     if name == anim.POOP:
-        return sprites.POOP
+        return sprites.POOP_FRAMES[0]
     sheet = sprites.fx_sheet()
     i = sprites.fx_index(name)
     return sheet[i * sprites.FX_SIZE : (i + 1) * sprites.FX_SIZE]
@@ -166,7 +166,9 @@ def test_poops_pile_up_two_by_two_beside_the_pet():
     assert pile[0][2] == pile[1][2] > pile[2][2] == pile[3][2]  # bottom row first
     pet_right = anim.POOP_PET_X + ink_box(sprites.pet_sheet()[:16])[2]
     for _, x, y, _ in pile:
-        assert x + ink_box(sprites.POOP)[0] > pet_right + 1  # a gap between pet and poop
+        for rows in sprites.POOP_FRAMES:
+            assert x + ink_box(rows)[0] > pet_right + 1  # a gap between pet and poop
+            assert ink_box(rows)[2] < anim.POOP_PILE[1][1] - anim.POOP_PILE[0][1] - 1  # a gap between neighbours
 
 
 def test_dying_the_ufo_beams_it_up_and_flies_off():

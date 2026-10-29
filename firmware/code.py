@@ -42,7 +42,7 @@ from pet.game import Game
 
 # ---- Tuning knobs -----------------------------------------------------------
 
-VOLUME = 0.25  # speaker loudness, 0.0-1.0 (square-wave amplitude into the amp)
+VOLUME = 0.5  # speaker loudness, 0.0-1.0 (square-wave amplitude into the amp)
 MUTE = False  # True = no sound at all; everything else works the same
 
 RESTING_LEVEL = 0.15  # backlight while nobody is playing (0.0-1.0)

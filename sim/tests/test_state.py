@@ -428,13 +428,13 @@ def test_decay_scale_stretches_every_drain_time():
         assert minutes == pytest.approx(EMPTY_MINUTES[name] * DECAY_SCALE)
 
 
-def test_eat_and_drink_are_refused_when_full_and_treats_never_are():
+def test_eat_and_drink_are_refused_when_full_and_nothing_else_is():
     pet = full_pet()
     for name in STAT_NAMES:
         pet.stats[name] = FULL_LEVEL
     assert not pet.accepts("eat")
     assert not pet.accepts("drink")
-    for action in ("treat", "affection", "sleep", "play"):
+    for action in ("affection", "sleep", "play", "clean"):
         assert pet.accepts(action)
     pet.stats["hunger"] = FULL_LEVEL - 0.5
     assert pet.accepts("eat")

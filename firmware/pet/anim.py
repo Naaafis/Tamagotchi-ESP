@@ -79,7 +79,7 @@ def hop(cue="happy"):
 HOP = hop()
 
 
-# ---- Eat, drink, treat ------------------------------------------------------
+# ---- Eat, drink ---------------------------------------------------------------
 
 APPEAR_MS = 500
 MOUTH_MS = 350  # mouth open, then the same again chewing

@@ -10,7 +10,7 @@ Three 1-bit sheets:
     fx           8x8, drawn at 8x next to the pet: food, cup, hearts,
                  sparkles, Z's, the flush wave, the UFO, the game's arrow
                  and digits
-and the poop, 8x8 at 8x in colour (POOP, POOP_COLORS).
+and the poop, 8x8 at 8x in colour (POOP_FRAMES, POOP_COLORS).
 """
 
 PET_SIZE = 16
@@ -287,19 +287,19 @@ _SLEEP = (  # crescent moon: lights off
     "............",
 )
 
-_PLAY = (  # ball
-    "....####....",
+_PLAY = (  # game controller: D-pad on the left, four buttons on the right
+    "............",
+    "............",
     "..########..",
-    ".###....###.",
+    ".#........#.",
+    "#..#....#..#",
+    "#.###..#.#.#",
+    "#..#....#..#",
+    "#..........#",
+    "#...####...#",
+    "#..#....#..#",
     ".##......##.",
-    "##........##",
-    "##...##...##",
-    "##...##...##",
-    "##........##",
-    ".##......##.",
-    ".###....###.",
-    "..########..",
-    "....####....",
+    "............",
 )
 
 _CLEAN = (  # rubber duck: the flush
@@ -704,20 +704,45 @@ def fx_index(name):
     return FX_NAMES.index(name)
 
 
-# ---- The poop: 8x8 at 8x, in colour -----------------------------------------
-# A chocolate-drop shape: a wide rounded base rising to a pointed tip, dark
-# brown with a glossy streak, and a thin white paper strip out of the top.
+# ---- The poop: 8x8 at 8x ----------------------------------------------------
+# A solid lump in the LCD's ink, the way the original draws it: a small peak,
+# stepping down on both sides to a wide flat base, with a light hole for a
+# highlight. Two little
+# stink squiggles float clear of it, the left one higher, and flip > / < to
+# wiggle (POOP_FRAMES 0 and 1). A poop with another stacked on top of it shows POOP_PLAIN (no
+# squiggles), so the pile reads. Everything stays in columns 0-5: the pile
+# puts poops 7 apart, so neighbours keep a one-column gap.
 # '.' is see-through; the other characters index POOP_COLORS.
 
-POOP = (
-    "...o....",
-    "...o....",
-    "...#....",
-    "..#+#...",
-    ".#+###..",
-    "#+#####.",
-    "#######.",
-    ".#####..",
+_POOP_LUMP = (
+    "..#.....",
+    ".###....",
+    ".#.##...",
+    "######..",
 )
-POOP_CHARS = ".#+o"  # bitmap value = index here
-POOP_COLORS = (None, 0x4A2A12, 0x9A6638, 0xF4F4F4)  # see-through, brown, gloss, paper
+POOP_FRAMES = (
+    (
+        "~.......",
+        ".~..~...",
+        "~....~..",
+        "....~...",
+    ) + _POOP_LUMP,
+    (
+        ".~......",
+        "~....~..",
+        ".~..~...",
+        ".....~..",
+    ) + _POOP_LUMP,
+    ("........",) * 4 + _POOP_LUMP,
+)
+POOP_PLAIN = 2  # index in POOP_FRAMES: no stink lines
+POOP_CHARS = ".#~"  # bitmap value = index here
+POOP_COLORS = (None, 0x14201A, 0x14201A)  # see-through, lump, stink: the day ink (ui.INK_DAY)
+
+
+def poop_sheet():
+    """The poop frames stacked vertically, FX_SIZE rows each."""
+    rows = []
+    for f in POOP_FRAMES:
+        rows.extend(f)
+    return rows

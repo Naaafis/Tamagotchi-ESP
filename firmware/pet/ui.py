@@ -75,6 +75,7 @@ ROW_ICON_SCALE = 2
 ROW_BAR_X = 56
 
 BLINK_SECONDS = 0.5  # attention icon on/off
+POOP_WIGGLE_SECONDS = 0.5  # stink lines sway
 IDLE_FRAME_SECONDS = 0.6
 
 
@@ -196,7 +197,7 @@ class PetUI:
         # Poops are in colour, so they get their own bitmap, palette and
         # slots, under the fx slots (the flush wave passes over them). Lights
         # off hides them, so the palette never needs the night theme.
-        poop_bitmap = bitmap_from_art(sprites.POOP, sprites.POOP_CHARS)
+        poop_bitmap = bitmap_from_art(sprites.poop_sheet(), sprites.POOP_CHARS)
         poop_palette = displayio.Palette(len(sprites.POOP_COLORS))
         for i in range(len(sprites.POOP_COLORS)):
             if sprites.POOP_COLORS[i] is None:
@@ -205,7 +206,12 @@ class PetUI:
                 poop_palette[i] = sprites.POOP_COLORS[i]
         self._poop_slots = []
         for _ in range(POOP_SLOTS):
-            slot = displayio.TileGrid(poop_bitmap, pixel_shader=poop_palette)
+            slot = displayio.TileGrid(
+                poop_bitmap,
+                pixel_shader=poop_palette,
+                tile_width=sprites.FX_SIZE,
+                tile_height=sprites.FX_SIZE,
+            )
             slot.hidden = True
             self.stage.insert(1, slot)  # right above the pet
             self._poop_slots.append(slot)
@@ -250,6 +256,7 @@ class PetUI:
         self._pet_flip = False
         self._slot_shown = [None] * SLOT_COUNT  # overlay tuple per slot, None = hidden
         self._poop_shown = [None] * POOP_SLOTS  # (x, y) per poop slot, None = hidden
+        self._poop_tile = [0] * POOP_SLOTS  # POOP_FRAMES index each slot shows
         self._pet_index = {}
         for name in sprites.PET_FRAMES:
             self._pet_index[name] = sprites.pet_frame_index(name)
@@ -406,6 +413,21 @@ class PetUI:
                     bitmap[1 + x, y] = value
             entry[1] = segments
 
+    def _wiggle_poops(self, now):
+        """Sway the stink lines on the poops with nothing stacked on top; covered ones stay plain."""
+        phase = int(now / POOP_WIGGLE_SECONDS) % 2
+        for i in range(POOP_SLOTS):
+            shown = self._poop_shown[i]
+            if shown is None:
+                continue
+            tile = phase
+            for other in self._poop_shown:
+                if other is not None and other[0] == shown[0] and other[1] < shown[1]:
+                    tile = sprites.POOP_PLAIN
+            if tile != self._poop_tile[i]:
+                self._poop_slots[i][0] = tile
+                self._poop_tile[i] = tile
+
     # ---- per-frame update ----
 
     def render(self, game, now):
@@ -451,6 +473,7 @@ class PetUI:
             x = anim.POOP_PET_X if pet.poops else anim.HOME_X
             self._show_pet(self._pose_frame(pet, now), x, anim.HOME_Y, False)
             self._show_overlays(anim.POOP_PILE[: pet.poops])
+        self._wiggle_poops(now)
 
         # The fourth poop sits where the bubble goes.
         if scene is not None or pet.asleep or pet.dead or pet.poops >= MAX_POOPS:

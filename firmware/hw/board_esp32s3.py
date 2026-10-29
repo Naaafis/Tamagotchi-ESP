@@ -5,7 +5,7 @@ Screen: HiLetgo 2.8" ILI9341, 320x240, SPI.
   DC   -> IO9     RST  -> IO8     LED -> IO7 (PWM backlight)
 Buttons: 1x3 membrane keypad, common on GND, one GPIO per key. Internal pull-ups.
   A (left) -> IO6   B (middle) -> IO4   C (right) -> IO5
-Audio: MAX98357A I2S amp, VIN on 5V, GAIN and SD floating.
+Audio: MAX98357A I2S amp, VIN on 5V, SD on 3V3 (left channel), GAIN floating.
   BCLK -> IO15    LRC  -> IO16    DIN -> IO17
 """
 

@@ -14,6 +14,8 @@ def test_art_rows_have_the_declared_width():
     assert len(sprites.pet_sheet()) == sprites.PET_SIZE * len(sprites.PET_FRAMES)
     assert len(sprites.icon_sheet()) == sprites.ICON_SIZE * len(sprites.ICON_NAMES)
     assert len(sprites.fx_sheet()) == sprites.FX_SIZE * len(sprites.FX_NAMES)
+    assert len(sprites.poop_sheet()) == sprites.FX_SIZE * len(sprites.POOP_FRAMES)
+    assert all(len(row) == sprites.FX_SIZE for row in sprites.poop_sheet())
     bitmap_from_rows(sprites.pet_sheet(), sprites.PET_SIZE)
     bitmap_from_rows(sprites.icon_sheet(), sprites.ICON_SIZE)
     bitmap_from_rows(sprites.fx_sheet(), sprites.FX_SIZE)
@@ -146,10 +148,16 @@ def test_poops_show_in_their_own_slots_and_the_sweep_wipes_them():
     assert ui._poop_shown == [(x, y) for _n, x, y, _f in anim.POOP_PILE[:2]] + [None] * (len(ui._poop_slots) - 2)
     for i in range(2):
         assert not ui._poop_slots[i].hidden
+    assert ui._poop_tile[:2] == [0, 0]  # nothing stacked: stink lines
+    g.update(0.6)
+    assert ui._poop_tile[:2] == [1, 1]  # and they sway
     for _ in range(2):
         g.pet.poop(0.0)
-    g.update(0.2)
+    g.update(1.05)
     assert ui._bubble_group.hidden  # a full pile: no room for the bubble
+    plain = sprites.POOP_PLAIN
+    assert ui._poop_tile == [plain, plain, 0, 0]  # the bottom two are covered
+    assert [s[0] for s in ui._poop_slots] == ui._poop_tile
     frames = anim.clean_frames(4)
     for f in frames:
         g.scene = Fixed(f)

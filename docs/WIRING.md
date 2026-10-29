@@ -52,7 +52,7 @@ Lives in the bag next to the board. Only the 2 speaker wires need to run anywher
 | LRC | GPIO 16 |
 | DIN | GPIO 17 |
 | GAIN | leave floating (9 dB) |
-| SD | leave floating (on, L+R mono mix) |
+| SD | 3V3 (jumper: amp on, plays the left channel; CircuitPython sends our mono samples on both channels) |
 | Speaker + / − | speaker |
 
 ## Power
