@@ -10,15 +10,22 @@ sulks; there is no death, it recovers as soon as it gets what it was missing.
 
 # ---- Tuning knobs -----------------------------------------------------------
 
+# How slowly every stat drains: each time in EMPTY_MINUTES is multiplied by
+# this. 1.0 is the original party pace (an ask every ~2.7 min); 3.3 gives an
+# ask every ~9 min and the first one ~8 min after power-on. Raise it to make
+# the pet less needy, lower it to make it ask more often.
+DECAY_SCALE = 3.3
+
 STAT_MAX = 100
 
 # Stat order everywhere (dict iteration order is not guaranteed on MicroPython).
 STAT_NAMES = ("hunger", "thirst", "energy", "fun", "treats", "affection")
 
-# Minutes for each stat to drain from full to empty while awake. A stat asks
-# for care when it reaches LOW_THRESHOLD, so after a full refill hunger asks
-# again 0.7 * 21 = 14.7 minutes later. Across all six stats that is one ask
-# every ~2.7 minutes once they are out of phase (1/14.7 + 1/11.9 + ... per min).
+# Minutes for each stat to drain from full to empty while awake, before
+# DECAY_SCALE. A stat asks for care when it reaches LOW_THRESHOLD, so after a
+# full refill hunger asks again 0.7 * 21 * DECAY_SCALE minutes later. Across
+# all six stats that is one ask every ~2.7 * DECAY_SCALE minutes once they are
+# out of phase (1/14.7 + 1/11.9 + ... per minute at DECAY_SCALE 1).
 EMPTY_MINUTES = {
     "hunger": 21,
     "thirst": 17,
@@ -28,10 +35,11 @@ EMPTY_MINUTES = {
     "affection": 26,
 }
 
-# Fresh-pet levels, staggered so the first asks land 3-6 minutes after
-# power-on instead of all together a quarter of an hour in.
+# Fresh-pet levels, staggered so the asks don't all land together. At
+# DECAY_SCALE 3.3 hunger asks first, ~8 minutes after power-on, and the rest
+# follow over the next 4-11 minutes.
 START_LEVELS = {
-    "hunger": 45,
+    "hunger": 42,
     "thirst": 55,
     "energy": 40,
     "fun": 50,
@@ -41,6 +49,15 @@ START_LEVELS = {
 
 # At or below this the need is "low": attention icon on, pet looks sad.
 LOW_THRESHOLD = 30
+
+# At or above this the pet is "full" and refuses food or drink (it shakes its
+# head and the food stays, like the original). After a meal that is the next
+# ~(100 - FULL_LEVEL) / 100 * 21 * DECAY_SCALE minutes.
+FULL_LEVEL = 90
+
+# Actions the pet can refuse when the stat they fill is already full. Treats
+# are like the original's snacks: always welcome.
+REFUSABLE = ("eat", "drink")
 
 # Other stats drain this much slower while the pet sleeps.
 SLEEP_DECAY_FACTOR = 0.5
@@ -92,7 +109,7 @@ POSE_SLEEP = "sleep"
 
 def decay_per_second(name):
     """Points per second the stat loses while awake."""
-    return STAT_MAX / (EMPTY_MINUTES[name] * 60.0)
+    return STAT_MAX / (EMPTY_MINUTES[name] * DECAY_SCALE * 60.0)
 
 
 def _clamp(value):
@@ -129,6 +146,15 @@ class Pet:
 
     def is_low(self, name):
         return self.stats[name] <= LOW_THRESHOLD
+
+    def is_full(self, name):
+        return self.stats[name] >= FULL_LEVEL
+
+    def accepts(self, action):
+        """False when the pet would refuse this action (full and it's eat or drink)."""
+        if action in REFUSABLE:
+            return not self.is_full(ACTION_STAT[action])
+        return True
 
     def low_needs(self):
         """Stat names at or below LOW_THRESHOLD, in STAT_NAMES order."""
@@ -243,6 +269,11 @@ class Pet:
         self._reaction_until = now + REACTION_SECONDS
         self._update_attention()
         return True
+
+    def add(self, stat, amount):
+        """Raise (or lower) one stat by amount points, clamped to 0..STAT_MAX."""
+        self.stats[stat] = _clamp(self.stats[stat] + amount)
+        self._update_attention()
 
     def sleep(self, now):
         """Lights off. Energy refills over SLEEP_FULL_SECONDS."""

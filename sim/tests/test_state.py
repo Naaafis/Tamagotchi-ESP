@@ -6,7 +6,9 @@ from pet import state
 from pet.state import (
     ACTIONS,
     ACTION_STAT,
+    DECAY_SCALE,
     EMPTY_MINUTES,
+    FULL_LEVEL,
     LOW_THRESHOLD,
     NAP_MIN_SECONDS,
     REACTION_SECONDS,
@@ -47,7 +49,7 @@ def test_stats_decay_linearly_at_their_rate():
     pet = full_pet()
     pet.tick(60.0)
     for name in STAT_NAMES:
-        expected = STAT_MAX - STAT_MAX / EMPTY_MINUTES[name]  # one minute's worth
+        expected = STAT_MAX - STAT_MAX / (EMPTY_MINUTES[name] * DECAY_SCALE)  # one minute's worth
         assert pet.stats[name] == pytest.approx(expected)
 
 
@@ -195,16 +197,49 @@ def run_perfect_carer(hours):
     return asks
 
 
-def test_first_ask_comes_within_a_few_minutes_of_power_on():
+def test_first_ask_comes_about_eight_minutes_after_power_on():
     asks = run_perfect_carer(0.25)
     assert asks, "no ask in the first 15 minutes"
-    assert 120 <= asks[0] <= 300
+    assert 7 * 60 <= asks[0] <= 9 * 60, "first ask at %.0f s" % asks[0]
 
 
-def test_pet_asks_for_something_every_two_to_four_minutes():
-    asks = run_perfect_carer(3)
+def test_pet_asks_for_something_every_eight_to_ten_minutes():
+    asks = run_perfect_carer(8)
     gaps = [b - a for a, b in zip(asks, asks[1:])]
-    assert len(gaps) > 20
+    assert len(gaps) > 40
     mean = sum(gaps) / len(gaps)
-    assert 120 <= mean <= 240, "mean gap %.0f s" % mean
-    assert max(gaps) <= 15 * 60, "longest quiet stretch %.0f s" % max(gaps)
+    assert 8 * 60 <= mean <= 10 * 60, "mean gap %.0f s" % mean
+    assert max(gaps) <= 15 * 60 * DECAY_SCALE, "longest quiet stretch %.0f s" % max(gaps)
+
+
+def test_decay_scale_stretches_every_drain_time():
+    for name in STAT_NAMES:
+        minutes = STAT_MAX / decay_per_second(name) / 60
+        assert minutes == pytest.approx(EMPTY_MINUTES[name] * DECAY_SCALE)
+
+
+def test_eat_and_drink_are_refused_when_full_and_treats_never_are():
+    pet = full_pet()
+    for name in STAT_NAMES:
+        pet.stats[name] = FULL_LEVEL
+    assert not pet.accepts("eat")
+    assert not pet.accepts("drink")
+    for action in ("treat", "affection", "sleep", "play"):
+        assert pet.accepts(action)
+    pet.stats["hunger"] = FULL_LEVEL - 0.5
+    assert pet.accepts("eat")
+    assert not pet.accepts("drink")
+
+
+def test_add_clamps_and_updates_attention():
+    pet = full_pet()
+    pet.stats["fun"] = LOW_THRESHOLD - 5
+    pet.tick(0.0)
+    assert pet.attention
+    pet.add("fun", 25)
+    assert pet.level("fun") == LOW_THRESHOLD + 20
+    assert not pet.attention
+    pet.add("fun", 500)
+    assert pet.level("fun") == STAT_MAX
+    pet.add("fun", -500)
+    assert pet.level("fun") == 0
