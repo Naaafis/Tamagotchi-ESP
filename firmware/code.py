@@ -1,34 +1,52 @@
 """The pet on the board: pet.game.Game driven by the three buttons.
 
-Buttons A/B/C (hw.board_esp32s3, keypad with internal pull-ups) feed presses
-into Game.update(). The backlight comes up to BRIGHT_LEVEL on every press and
-whenever the pet starts asking for attention, then fades down to RESTING_LEVEL
-after IDLE_SECONDS without a press.
+Buttons A/B/C (hw.board_esp32s3, keypad with internal pull-ups) feed presses,
+and which buttons are held, into Game.update(). The backlight comes up to
+BRIGHT_LEVEL on every press, whenever the pet starts asking for attention and
+for the whole left/right game, then fades down to RESTING_LEVEL after
+IDLE_SECONDS without a press, or straight away when the lights go out.
+
+Sound (pet.sound, played through the MAX98357A by hw.board_esp32s3.Audio): a
+tick on every press, a three-beep chirp when the pet starts asking for
+attention and again every pet.sound.REMINDER_SECONDS while it keeps asking,
+the animations' cues (a blip per bite or sip, a double tone when it refuses,
+the jingle as it hops, the game's match/miss/win/lose), a low sad tune when
+it starts sulking, and a short hello at power-on. The tunes themselves are in
+pet/sound.py.
 
 Serial prints every press and release stamped with the keypad scanner's own
 time, with the hold time and the gap since that button's last release (a
-bounce shows up as a few-ms hold or gap), every attention event,
-any loop iteration slower than SLOW_FRAME_MS, and a status line every
-STATUS_SECONDS with the pet's stats, the slowest frame and the longest gap
-between two frames (which includes the display's background refreshes).
+bounce shows up as a few-ms hold or gap), every attention event, action,
+cue, sulk and sound (except the tick), any loop iteration slower than
+SLOW_FRAME_MS, and a status line every STATUS_SECONDS with the pet's stats,
+the slowest frame and the longest gap between two frames (which includes the
+display's background refreshes). At boot it prints the reset reason and, if
+safemode.py just brought the board back from a crash, which crash.
 """
 
 import gc
 import time
 
+import microcontroller
+
 from hw.board_esp32s3 import (
     HEIGHT,
     WIDTH,
     button_events,
+    get_audio,
     get_backlight,
     get_display,
     get_keys,
     ticks_diff,
     ticks_ms,
 )
+from pet import sound
 from pet.game import Game
 
 # ---- Tuning knobs -----------------------------------------------------------
+
+VOLUME = 0.5  # speaker loudness, 0.0-1.0 (square-wave amplitude into the amp)
+MUTE = False  # True = no sound at all; everything else works the same
 
 RESTING_LEVEL = 0.15  # backlight while nobody is playing (0.0-1.0)
 BRIGHT_LEVEL = 1.00  # backlight after a press or when the pet asks for something
@@ -64,6 +82,10 @@ GC_INTERVAL_SECONDS = 300
 backlight = get_backlight()
 display = get_display()
 get_keys()  # start scanning now so a press during setup isn't lost
+audio = get_audio(VOLUME)
+for _tune in sound.TUNES:
+    audio.prepare(_tune)  # render every tune now (~100 ms) so no press waits for it
+sounds = sound.Sounds(audio, mute=MUTE)
 
 # The game clock: seconds since boot, built from ticks_ms() so it keeps
 # millisecond precision all night (time.monotonic() loses precision over time).
@@ -122,23 +144,77 @@ def brighten(reason):
 
 def on_button(name):
     brighten("button " + name)
+    sounds.button()
 
 
 def on_attention():
     log("attention: " + game.pet.summary())
     brighten("attention")
+    sounds.attention()
+
+
+def on_action(action):
+    log("action: " + action)
+
+
+def on_cue(name):
+    log("cue: " + name)
+    sounds.cue(name)
+
+
+def on_sulk():
+    log("sulk: " + game.pet.summary())
+    sounds.sulk()
+
+
+def on_death():
+    log("died: " + game.pet.summary())
+    brighten("died")
+
+
+def on_reset():
+    log("reset: new pet: " + game.pet.summary())
+    brighten("reset")
+    sounds.play(sound.STARTUP)
 
 
 game.on_button = on_button
 game.on_attention = on_attention
+game.on_action = on_action
+game.on_cue = on_cue
+game.on_sulk = on_sulk
+game.on_death = on_death
+game.on_reset = on_reset
 
 # ---- Main loop --------------------------------------------------------------
 
 log(
-    "T8 OK: game on %dx%d, buttons A/B/C on IO4/IO5/IO6, backlight %d%% -> %d%% after %gs idle"
-    % (WIDTH, HEIGHT, int(BRIGHT_LEVEL * 100), int(RESTING_LEVEL * 100), IDLE_SECONDS)
+    "T11 OK: game on %dx%d, buttons A/B/C on IO6/IO4/IO5, backlight %d%% -> %d%% after %gs idle, sound %s"
+    % (
+        WIDTH,
+        HEIGHT,
+        int(BRIGHT_LEVEL * 100),
+        int(RESTING_LEVEL * 100),
+        IDLE_SECONDS,
+        "muted" if MUTE else "volume %g" % VOLUME,
+    )
 )
 log("pet: " + game.pet.summary())
+
+CRASH_NVM_BYTES = 24  # where safemode.py leaves the name of the crash it recovered from
+
+
+def report_reset():
+    """Say how this boot came about, and whether safemode.py just recovered from a crash."""
+    log("reset reason: " + str(microcontroller.cpu.reset_reason).split(".")[-1])
+    note = bytes(microcontroller.nvm[0:CRASH_NVM_BYTES]).rstrip(b"\x00")
+    if note:
+        log("recovered from safe mode: " + note.decode("ascii", "replace"))
+        microcontroller.nvm[0:CRASH_NVM_BYTES] = bytes(CRASH_NVM_BYTES)
+
+
+report_reset()
+sounds.play(sound.STARTUP)
 
 _idle_ms = int(IDLE_SECONDS * 1000)
 _next_status_ms = STATUS_SECONDS * 1000
@@ -148,6 +224,8 @@ _slow_frames = 0
 _longest_gap_ms = 0
 _prev_frame_start = None
 _down_ticks = {}  # button name -> ticks when it went down
+_held = []  # buttons down right now (holds: C leaves the game, B resets, A poops)
+_lights_were_off = False
 _release_ticks = {}  # button name -> ticks of its last release
 _gc_idle_ms = GC_IDLE_SECONDS * 1000
 _gc_interval_ms = GC_INTERVAL_SECONDS * 1000
@@ -170,19 +248,32 @@ while True:
                 text += " (%d ms after its last release)" % ticks_diff(ticks, _release_ticks[name])
             _down_ticks[name] = ticks
             presses.append(name)
+            if name not in _held:
+                _held.append(name)
         else:
             text = name + " release"
             if name in _down_ticks:
                 text += " (held %d ms)" % ticks_diff(ticks, _down_ticks[name])
             _release_ticks[name] = ticks
+            if name in _held:
+                _held.remove(name)
         log(text, ticks_to_clock(ticks))
 
-    game.update(frame_start / 1000.0, presses)
+    game.update(frame_start / 1000.0, presses, _held)
+    tune = sounds.update(frame_start / 1000.0, game.pet.attention)
+    if tune is not None and tune != sound.TICK:
+        log("sound: %s (%d ms)" % (sound.name(tune), sound.duration_ms(tune)))
     _update_ms = clock_ms() - frame_start
 
+    if game.playing:
+        brighten("game")  # stays up for the whole game
+    lights_off = game.lights_off
+    if lights_off and not _lights_were_off:
+        _last_activity_ms = frame_start - _idle_ms  # lights out: dim now, not in 15 s
+    _lights_were_off = lights_off
     if backlight.target > RESTING_LEVEL and frame_start - _last_activity_ms >= _idle_ms:
         backlight.fade_to(RESTING_LEVEL, FADE_DOWN_SECONDS)
-        log("backlight down (idle %gs)" % IDLE_SECONDS)
+        log("backlight down (%s)" % ("lights off" if lights_off else "idle %gs" % IDLE_SECONDS))
     backlight.update()
 
     if frame_start - _last_activity_ms >= _gc_idle_ms and frame_start - _last_gc_ms >= _gc_interval_ms:

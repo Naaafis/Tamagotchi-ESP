@@ -3,9 +3,13 @@
 
     .venv/bin/python sim/run_desktop.py
 
-Keys: A / S / D are buttons A / B / C. Esc or closing the window quits.
+Keys: A / S / D are buttons A / B / C. Hold D to leave the left/right game,
+S for 10 s to start a new pet, A for 3 s to make it poop now.
+Esc or closing the window quits.
 The window is the 320x240 screen scaled up (3x by default); everything
 outside the centered 240x240 square stays black, like the real panel.
+There is no audio: the terminal prints which tune the board would play
+(pet.sound), the button tick included.
 
 Options:
     --scale N          window scale (default 3)
@@ -29,6 +33,7 @@ import busdisplay  # noqa: E402
 import pygame  # noqa: E402
 import blinka_displayio_pygamedisplay as pgd  # noqa: E402
 
+from pet import sound  # noqa: E402
 from pet.game import Game  # noqa: E402
 
 WIDTH = 320
@@ -36,6 +41,16 @@ HEIGHT = 240
 FRAME_RATE = 30  # window redraws per second; the real panel refreshes at about this rate
 PRESS_INTERVAL = 0.4
 STATUS_INTERVAL = 1.0
+
+
+class PrintPlayer:
+    """Stands in for the board's speaker: prints the tune instead of playing it."""
+
+    def __init__(self, start):
+        self._start = start
+
+    def play(self, tune):
+        print("[%6.1fs] sound: %s (%d ms)" % (time.monotonic() - self._start, sound.name(tune), sound.duration_ms(tune)))
 
 
 class SimDisplay(pgd.PyGameDisplay):
@@ -102,8 +117,42 @@ def main():
 
     start = time.monotonic()
     game = Game(now=start, width=WIDTH, height=HEIGHT)
-    game.on_attention = lambda: print("[%6.1fs] attention: %s" % (time.monotonic() - start, game.pet.summary()))
-    game.on_button = lambda name: print("[%6.1fs] button %s" % (time.monotonic() - start, name))
+    sounds = sound.Sounds(PrintPlayer(start))
+
+    def on_attention():
+        print("[%6.1fs] attention: %s" % (time.monotonic() - start, game.pet.summary()))
+        sounds.attention()
+
+    def on_button(name):
+        print("[%6.1fs] button %s" % (time.monotonic() - start, name))
+        sounds.button()
+
+    def on_action(action):
+        print("[%6.1fs] action: %s" % (time.monotonic() - start, action))
+
+    def on_cue(name):
+        print("[%6.1fs] cue: %s" % (time.monotonic() - start, name))
+        sounds.cue(name)
+
+    def on_sulk():
+        print("[%6.1fs] sulk: %s" % (time.monotonic() - start, game.pet.summary()))
+        sounds.sulk()
+
+    game.on_attention = on_attention
+    game.on_button = on_button
+    def on_death():
+        print("[%6.1fs] died: %s" % (time.monotonic() - start, game.pet.summary()))
+
+    def on_reset():
+        print("[%6.1fs] reset: %s" % (time.monotonic() - start, game.pet.summary()))
+        sounds.play(sound.STARTUP)
+
+    game.on_action = on_action
+    game.on_cue = on_cue
+    game.on_sulk = on_sulk
+    game.on_death = on_death
+    game.on_reset = on_reset
+    sounds.play(sound.STARTUP)
 
     # Same as firmware/code.py on the board; the scaling is pygame's, not displayio's.
     display.root_group = game.root_group
@@ -127,7 +176,10 @@ def main():
             events.append(scripted.pop(0))
             next_press = now + PRESS_INTERVAL
 
-        game.update(now, events)
+        down = pygame.key.get_pressed()
+        held = [name for key, name in keys.items() if down[key]]
+        game.update(now, events, held)
+        sounds.update(now, game.pet.attention)
 
         if now >= next_frame:
             next_frame = now + 1 / FRAME_RATE

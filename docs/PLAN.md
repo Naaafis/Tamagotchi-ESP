@@ -14,7 +14,7 @@ Christina goes as a Tamagotchi for Halloween. A screen on her chest shows a pixe
 | Board | ESP32-S3 (AYWHP, N16R8 module) | Already owned, no soldering, instant boot, safe to pull power, low draw. Pi Zero is the backup. |
 | Language | CircuitPython | Python, no compile/flash loop (save `code.py` and it reloads), good display/button/audio libraries. |
 | Screen | HiLetgo 2.8" ILI9341 SPI, 320×240, LED backlit | No 2-3" square SPI panel exists. We render into a **centered 240×240 square** and black out the sides; the costume bezel hides them. |
-| Buttons | 3× 12mm tactile, yellow caps | A = cycle icons, B = select, C = cancel (same as the real toy). |
+| Buttons | 1×3 membrane keypad (JESSINIE MG001V) | A = cycle icons, B = select, C = cancel (same as the real toy). Replaced the 12mm tactile buttons. |
 | Sound | MAX98357A I2S amp + 4Ω 3W 40mm speaker | Board can't drive a speaker directly. Fallback: piezo buzzer on one GPIO. |
 | Placement | Screen on chest, buttons on belly, **board + amp + battery in a small bag on her back** | 50cm jumpers run over the shoulder. Lower SPI clock if the screen glitches over the long run. |
 | Base code | Write our own game in CircuitPython, borrowing structure and art ideas from reference repos | No existing repo targets this screen + 3 buttons + custom needs. See [REFERENCES.md](REFERENCES.md). |
@@ -25,12 +25,14 @@ Christina goes as a Tamagotchi for Halloween. A screen on her chest shows a pixe
 - **Needs (custom, replacing standard prompts):**
   - Eat, sleep, play (standard)
   - **Drink**
-  - **Treat** (trick-or-treat, Halloween tie-in)
   - **Affection**
+  - **Clean**: the pet poops now and then (more after eating or drinking), up to four piles beside it; Clean sweeps them away with a wave. While it's dirty, fun and affection drain faster. (Treat was dropped for this.)
   - Maybe: "change the song", "outfit change"
 - **Attention:** when a need is low, the attention icon lights, the speaker beeps, and the backlight brightens.
 - **Backlight:** on by default at low brightness (~10-15%), brightens on events and button presses, then fades back.
-- **Speed:** stats should decay fast enough that people at a party see the pet ask for things every few minutes. Must not die during a party (floor the stats, or make "death" a recoverable sulk).
+- **Speed:** stats should decay fast enough that people at a party see the pet ask for things every few minutes (`DECAY_SCALE` at the top of `pet/state.py`: first ask ~8 min, a poop every ~6-10 min).
+- **Death:** neglect kills it. Once a stat hits zero it sulks; left sulking ~10 minutes, a UFO takes it away. Holding the middle button 10 s starts a new pet anytime, dead or alive. (Holding left 3 s makes it poop now, for testing.)
+- **Pet art:** our own 1-bit drawings in the original's style (Sprout, a round critter with a leaf on top). No Bandai characters or sprites.
 - **Reference:** Christina's physical Tamagotchi. Photograph its screens for layout and icon reference.
 
 ## Architecture

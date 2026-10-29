@@ -3,10 +3,16 @@
 Screen: HiLetgo 2.8" ILI9341, 320x240, SPI.
   SCK  -> IO12    MOSI -> IO11    CS -> IO10
   DC   -> IO9     RST  -> IO8     LED -> IO7 (PWM backlight)
-Buttons: one leg to the GPIO, the other to a shared GND. Internal pull-ups.
-  A -> IO4        B -> IO5        C -> IO6
+Buttons: 1x3 membrane keypad, common on GND, one GPIO per key. Internal pull-ups.
+  A (left) -> IO6   B (middle) -> IO4   C (right) -> IO5
+Audio: MAX98357A I2S amp, VIN on 5V, SD on 3V3 (left channel), GAIN floating.
+  BCLK -> IO15    LRC  -> IO16    DIN -> IO17
 """
 
+import array
+
+import audiobusio
+import audiocore
 import board
 import busio
 import displayio
@@ -40,11 +46,28 @@ BUTTON_INTERVAL = 0.02
 BACKLIGHT_FREQUENCY = 5_000
 BACKLIGHT_INITIAL = 1.0  # start fully on so the screen is visible while testing
 
+# Audio sample rate. The ESP32 port preloads 3 DMA buffers of 1023 frames when
+# a sound starts and refills them from background callbacks, which wait while
+# a display refresh runs. A sound longer than the preload stutters if a
+# refresh outlasts the two buffers still queued: at 16 kHz that is ~190 ms
+# (22.05 kHz: ~140 ms), and the sleep/wake theme change costs ~200 ms. Square
+# waves up to ~4 kHz still sound clean at 16 kHz.
+AUDIO_SAMPLE_RATE = 16_000
+
 # ---- Pins -------------------------------------------------------------------
 
-BUTTON_PINS = (board.IO4, board.IO5, board.IO6)
+# Which GPIO each physical key of the membrane keypad lands on (plug pin 1 is
+# the common, on GND). The plug's key pins are not in left-to-right order, so
+# the order is fixed here rather than by rewiring:
+#   left key   -> plug pin 4 -> IO6 -> A (cycle)
+#   middle key -> plug pin 2 -> IO4 -> B (select)
+#   right key  -> plug pin 3 -> IO5 -> C (cancel)
+BUTTON_PINS = (board.IO6, board.IO4, board.IO5)
 BUTTON_NAMES = ("A", "B", "C")
 BACKLIGHT_PIN = board.IO7
+AUDIO_BCLK_PIN = board.IO15
+AUDIO_LRC_PIN = board.IO16
+AUDIO_DIN_PIN = board.IO17
 
 # ---- Display ----------------------------------------------------------------
 
@@ -219,3 +242,103 @@ def get_backlight():
     if _backlight is None:
         _backlight = Backlight()
     return _backlight
+
+
+# ---- Audio ------------------------------------------------------------------
+
+
+def _square(hz, count, amplitude):
+    """count samples of a square wave at hz, as a list.
+
+    A period is rarely a whole number of samples (2093 Hz at 16 kHz is 7.64),
+    so the wave is built from a block of up to 32 whole cycles whose length
+    comes closest to a whole number of samples, which keeps the pitch within
+    ~0.1%. The block is then repeated with list multiplication, which runs in
+    C. Growing one list run by run is far slower here: MicroPython's
+    list.extend() and slice assignment both copy the whole list each time
+    (~0.5-1.3 s for a half-second beep on this board).
+    """
+    period = AUDIO_SAMPLE_RATE / hz
+    cycles = 1
+    best = 1.0
+    for k in range(1, 33):
+        error = abs(k * period - int(k * period + 0.5)) / k
+        if error < best:
+            best = error
+            cycles = k
+    length = int(cycles * period + 0.5)
+    half = length / (2.0 * cycles)
+    block = []
+    level = amplitude
+    for edge in range(1, 2 * cycles + 1):
+        block += [level] * (int(edge * half + 0.5) - len(block))
+        level = -level
+    return block * (count // length) + block[: count % length]
+
+
+def _render(tune, amplitude):
+    """A tune as an array of signed 16-bit square-wave samples.
+
+    tune is a sequence of (hz, ms) notes; 0 Hz is a rest.
+    """
+    samples = []
+    for hz, ms in tune:
+        count = AUDIO_SAMPLE_RATE * ms // 1000
+        if hz > 0:
+            samples += _square(hz, count, amplitude)
+        else:
+            samples += [0] * count
+    return array.array("h", samples)
+
+
+class Audio:
+    """MAX98357A on I2S, playing tunes as square waves.
+
+    play(tune) returns at once: I2SOut preloads a few ms of the sample and
+    DMA plays the rest in the background, so the game loop never waits. A
+    new play() cuts off whatever is still playing. Each tune is rendered once
+    and cached; prepare() renders it ahead of time so the first play() of a
+    tune doesn't pay for that.
+    """
+
+    def __init__(self, volume=1.0):
+        self._i2s = audiobusio.I2SOut(
+            bit_clock=AUDIO_BCLK_PIN, word_select=AUDIO_LRC_PIN, data=AUDIO_DIN_PIN
+        )
+        self._amplitude = int(32767 * _clamp01(volume))
+        self._samples = {}  # tune -> RawSample
+
+    @property
+    def playing(self):
+        return self._i2s.playing
+
+    def prepare(self, tune):
+        """Render tune now (if it isn't already) and return its RawSample."""
+        sample = self._samples.get(tune)
+        if sample is None:
+            sample = audiocore.RawSample(
+                _render(tune, self._amplitude), sample_rate=AUDIO_SAMPLE_RATE
+            )
+            self._samples[tune] = sample
+        return sample
+
+    def play(self, tune):
+        """Start tune now, cutting off anything still playing."""
+        self._i2s.play(self.prepare(tune))
+
+    def stop(self):
+        self._i2s.stop()
+
+    def deinit(self):
+        self._i2s.deinit()
+
+
+_audio = None
+
+
+def get_audio(volume=1.0):
+    """Return the Audio player, creating it (at volume, 0.0-1.0) on first call."""
+    global _audio
+    if _audio is None:
+        _audio = Audio(volume)
+    return _audio
