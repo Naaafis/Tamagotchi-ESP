@@ -3,7 +3,8 @@
 
     .venv/bin/python sim/run_desktop.py
 
-Keys: A / S / D are buttons A / B / C. Esc or closing the window quits.
+Keys: A / S / D are buttons A / B / C (hold D to leave the left/right game).
+Esc or closing the window quits.
 The window is the 320x240 screen scaled up (3x by default); everything
 outside the centered 240x240 square stays black, like the real panel.
 There is no audio: the terminal prints which tune the board would play
@@ -127,7 +128,10 @@ def main():
 
     def on_action(action):
         print("[%6.1fs] action: %s" % (time.monotonic() - start, action))
-        sounds.action()
+
+    def on_cue(name):
+        print("[%6.1fs] cue: %s" % (time.monotonic() - start, name))
+        sounds.cue(name)
 
     def on_sulk():
         print("[%6.1fs] sulk: %s" % (time.monotonic() - start, game.pet.summary()))
@@ -136,6 +140,7 @@ def main():
     game.on_attention = on_attention
     game.on_button = on_button
     game.on_action = on_action
+    game.on_cue = on_cue
     game.on_sulk = on_sulk
     sounds.play(sound.STARTUP)
 
@@ -161,7 +166,9 @@ def main():
             events.append(scripted.pop(0))
             next_press = now + PRESS_INTERVAL
 
-        game.update(now, events)
+        down = pygame.key.get_pressed()
+        held = [name for key, name in keys.items() if down[key]]
+        game.update(now, events, held)
         sounds.update(now, game.pet.attention)
 
         if now >= next_frame:

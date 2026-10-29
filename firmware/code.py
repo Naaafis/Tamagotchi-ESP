@@ -1,20 +1,23 @@
 """The pet on the board: pet.game.Game driven by the three buttons.
 
-Buttons A/B/C (hw.board_esp32s3, keypad with internal pull-ups) feed presses
-into Game.update(). The backlight comes up to BRIGHT_LEVEL on every press and
-whenever the pet starts asking for attention, then fades down to RESTING_LEVEL
-after IDLE_SECONDS without a press.
+Buttons A/B/C (hw.board_esp32s3, keypad with internal pull-ups) feed presses,
+and which buttons are held, into Game.update(). The backlight comes up to
+BRIGHT_LEVEL on every press, whenever the pet starts asking for attention and
+for the whole left/right game, then fades down to RESTING_LEVEL after
+IDLE_SECONDS without a press, or straight away when the lights go out.
 
 Sound (pet.sound, played through the MAX98357A by hw.board_esp32s3.Audio): a
 tick on every press, a three-beep chirp when the pet starts asking for
-attention and again every pet.sound.REMINDER_SECONDS while it keeps asking, a
-jingle when a care action is done, a low sad tune when it starts sulking, and
-a short hello at power-on. The tunes themselves are in pet/sound.py.
+attention and again every pet.sound.REMINDER_SECONDS while it keeps asking,
+the animations' cues (a blip per bite or sip, a double tone when it refuses,
+the jingle as it hops, the game's match/miss/win/lose), a low sad tune when
+it starts sulking, and a short hello at power-on. The tunes themselves are in
+pet/sound.py.
 
 Serial prints every press and release stamped with the keypad scanner's own
 time, with the hold time and the gap since that button's last release (a
 bounce shows up as a few-ms hold or gap), every attention event, action,
-sulk and sound (except the tick), any loop iteration slower than
+cue, sulk and sound (except the tick), any loop iteration slower than
 SLOW_FRAME_MS, and a status line every STATUS_SECONDS with the pet's stats,
 the slowest frame and the longest gap between two frames (which includes the
 display's background refreshes).
@@ -149,7 +152,11 @@ def on_attention():
 
 def on_action(action):
     log("action: " + action)
-    sounds.action()
+
+
+def on_cue(name):
+    log("cue: " + name)
+    sounds.cue(name)
 
 
 def on_sulk():
@@ -160,6 +167,7 @@ def on_sulk():
 game.on_button = on_button
 game.on_attention = on_attention
 game.on_action = on_action
+game.on_cue = on_cue
 game.on_sulk = on_sulk
 
 # ---- Main loop --------------------------------------------------------------
@@ -186,6 +194,8 @@ _slow_frames = 0
 _longest_gap_ms = 0
 _prev_frame_start = None
 _down_ticks = {}  # button name -> ticks when it went down
+_held = []  # buttons down right now (holding C leaves the game)
+_lights_were_off = False
 _release_ticks = {}  # button name -> ticks of its last release
 _gc_idle_ms = GC_IDLE_SECONDS * 1000
 _gc_interval_ms = GC_INTERVAL_SECONDS * 1000
@@ -208,22 +218,32 @@ while True:
                 text += " (%d ms after its last release)" % ticks_diff(ticks, _release_ticks[name])
             _down_ticks[name] = ticks
             presses.append(name)
+            if name not in _held:
+                _held.append(name)
         else:
             text = name + " release"
             if name in _down_ticks:
                 text += " (held %d ms)" % ticks_diff(ticks, _down_ticks[name])
             _release_ticks[name] = ticks
+            if name in _held:
+                _held.remove(name)
         log(text, ticks_to_clock(ticks))
 
-    game.update(frame_start / 1000.0, presses)
+    game.update(frame_start / 1000.0, presses, _held)
     tune = sounds.update(frame_start / 1000.0, game.pet.attention)
     if tune is not None and tune != sound.TICK:
         log("sound: %s (%d ms)" % (sound.name(tune), sound.duration_ms(tune)))
     _update_ms = clock_ms() - frame_start
 
+    if game.playing:
+        brighten("game")  # stays up for the whole game
+    lights_off = game.lights_off
+    if lights_off and not _lights_were_off:
+        _last_activity_ms = frame_start - _idle_ms  # lights out: dim now, not in 15 s
+    _lights_were_off = lights_off
     if backlight.target > RESTING_LEVEL and frame_start - _last_activity_ms >= _idle_ms:
         backlight.fade_to(RESTING_LEVEL, FADE_DOWN_SECONDS)
-        log("backlight down (idle %gs)" % IDLE_SECONDS)
+        log("backlight down (%s)" % ("lights off" if lights_off else "idle %gs" % IDLE_SECONDS))
     backlight.update()
 
     if frame_start - _last_activity_ms >= _gc_idle_ms and frame_start - _last_gc_ms >= _gc_interval_ms:

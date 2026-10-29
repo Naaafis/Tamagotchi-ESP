@@ -4,7 +4,19 @@ import pytest
 
 from pet import sound
 from pet.game import MENU_ITEMS, Game
-from pet.sound import CHIRP, HAPPY, REMINDER_SECONDS, SAD, STARTUP, TICK, TUNES, Sounds
+from pet.sound import (
+    BLIP,
+    CHIRP,
+    CUES,
+    HAPPY,
+    REFUSE,
+    REMINDER_SECONDS,
+    SAD,
+    STARTUP,
+    TICK,
+    TUNES,
+    Sounds,
+)
 from pet.state import LOW_THRESHOLD
 
 SAMPLE_RATE = 16_000  # hw.board_esp32s3.AUDIO_SAMPLE_RATE
@@ -44,21 +56,45 @@ def test_tick_is_short_and_chirp_is_three_beeps():
 def test_each_event_plays_its_tune():
     rec = Recorder()
     s = Sounds(rec)
-    for event, tune in ((s.button, TICK), (s.attention, CHIRP), (s.action, HAPPY), (s.sulk, SAD)):
+    for event, tune in ((s.button, TICK), (s.attention, CHIRP), (s.sulk, SAD)):
         event()
         assert s.update(1.0, False) == tune
-    assert rec.played == [TICK, CHIRP, HAPPY, SAD]
+    assert rec.played == [TICK, CHIRP, SAD]
     assert s.update(2.0, False) is None  # nothing new asked for
-    assert rec.played == [TICK, CHIRP, HAPPY, SAD]
+    assert rec.played == [TICK, CHIRP, SAD]
+
+
+def test_every_cue_the_animations_use_has_a_tune():
+    from pet import anim, minigame
+
+    used = set()
+    frame_sets = list(anim.ACTIONS.values()) + list(anim.REFUSALS.values())
+    frame_sets += [minigame.MATCH, minigame.MISS, minigame.WIN, minigame.LOSE]
+    for frames in frame_sets:
+        for f in frames:
+            if f[anim.CUE] is not None:
+                used.add(f[anim.CUE])
+    assert used == set(CUES)
+    for tune in CUES.values():
+        assert tune in TUNES
+    rec = Recorder()
+    s = Sounds(rec)
+    s.cue("bite")
+    s.update(0.0, False)
+    s.cue("refuse")
+    s.update(1.0, False)
+    s.cue("no such cue")
+    s.update(2.0, False)
+    assert rec.played == [BLIP, REFUSE]
 
 
 def test_at_most_one_tune_per_frame_and_the_tick_yields():
     rec = Recorder()
     s = Sounds(rec)
     s.button()
-    s.action()  # B on an action icon: tick, then the jingle
+    s.cue("happy")  # a tick, then the jingle, in one frame
     s.update(1.0, False)
-    s.action()
+    s.cue("happy")
     s.button()  # a tick after the jingle in the same frame doesn't replace it
     s.update(2.0, False)
     s.button()
@@ -120,8 +156,8 @@ def wired_game():
     s = Sounds(rec)
     g.on_button = lambda name: s.button()
     g.on_attention = s.attention
-    g.on_action = lambda action: s.action()
     g.on_sulk = s.sulk
+    g.on_cue = s.cue
 
     def step(now, presses=()):
         g.update(now, presses)
@@ -130,24 +166,29 @@ def wired_game():
     return g, rec, step
 
 
+def run(step, start, end, presses=None):
+    """Step every 50 ms from start to end; presses maps a time to its presses."""
+    presses = presses or {}
+    now = start
+    while now < end:
+        step(now, presses.get(round(now, 2), ()))
+        now = round(now + 0.05, 2)
+
+
 def test_game_events_play_the_right_tunes():
     g, rec, step = wired_game()
+    g.pet.stats["hunger"] = 50
     step(1.0, ["A"])  # move: tick
-    step(2.0, ["B"])  # eat: jingle only
-    assert rec.played == [TICK, HAPPY]
+    run(step, 2.0, 7.0, {2.0: ["B"], 3.0: ["A"]})  # eat; the A mid-animation is ignored
+    assert rec.played == [TICK, TICK, BLIP, BLIP, BLIP, HAPPY]
+    run(step, 7.0, 10.0, {7.0: ["B"]})  # full now: refused
+    assert rec.played[6:] == [TICK, REFUSE]
     g.pet.stats["fun"] = LOW_THRESHOLD + 0.001
-    step(3.0)  # attention edge
-    assert rec.played == [TICK, HAPPY, CHIRP]
+    step(11.0)  # attention edge
+    assert rec.played[-1] == CHIRP
     g.pet.stats["fun"] = 0.001
-    step(4.0)  # runs out: sulk
-    assert rec.played == [TICK, HAPPY, CHIRP, SAD]
-    step(4.0 + REMINDER_SECONDS)  # still asking: reminder chirp
-    assert rec.played == [TICK, HAPPY, CHIRP, SAD, CHIRP]
-    presses = ["C"] + ["A"] * (MENU_ITEMS.index("play") + 1) + ["B"]
-    step(30.0, presses)  # play fixes it: one jingle, attention off
-    assert rec.played[-1] == HAPPY
-    assert not g.pet.attention
+    step(12.0)  # runs out: sulk
+    assert rec.played[-1] == SAD
     count = len(rec.played)
-    for i in range(1, 6):
-        step(30.0 + i * REMINDER_SECONDS)  # nothing else is low yet: no reminders
-    assert len(rec.played) == count
+    step(11.0 + REMINDER_SECONDS)  # still asking: reminder chirp
+    assert rec.played[count:] == [CHIRP]

@@ -1,6 +1,6 @@
 """Menu cursor (firmware/pet/input.py) and the Game's button handling."""
 
-from pet import input
+from pet import anim, input
 from pet.game import MENU_ITEMS, PAGE_STATS, Game
 from pet.state import LOW_THRESHOLD, STAT_MAX, STAT_NAMES
 
@@ -77,13 +77,20 @@ def test_stats_page_opens_on_select_and_closes_on_b_or_c():
     assert g.page is None
 
 
+def after(start, frames):
+    """A time just after an animation that started at `start` has finished."""
+    return start + anim.duration_ms(frames) / 1000.0 + 0.05
+
+
 def test_any_button_wakes_a_sleeping_pet_without_doing_anything_else():
     g = game()
     presses = ["A"] * (MENU_ITEMS.index("sleep") + 1) + ["B"]
     g.update(1.0, presses)
     assert g.pet.asleep
     cursor = g.menu.cursor
-    g.update(2.0, ["A"])
+    g.update(after(1.0, anim.SLEEP))
+    assert g.lights_off
+    g.update(after(1.0, anim.SLEEP) + 0.1, ["A"])
     assert not g.pet.asleep
     assert g.menu.cursor == cursor  # the press was consumed by waking up
 
@@ -104,20 +111,23 @@ def test_hooks_fire_on_button_and_on_attention_edge():
     assert attention == [True]  # once per edge, not once per frame
 
 
-def test_on_action_fires_for_care_actions_only():
+def test_on_action_fires_for_accepted_care_actions_only():
     g = game()
     actions = []
     g.on_action = actions.append
     g.update(1.0, ["A", "B"])  # eat
     assert actions == ["eat"]
-    g.update(2.0, ["B"])  # again: the cursor stays on eat
-    assert actions == ["eat", "eat"]
-    g.update(3.0, ["C", "B", "A", "C"])  # cancel, B with nothing highlighted, move, cancel
-    assert actions == ["eat", "eat"]
+    t = after(1.0, anim.EAT)
+    g.update(t, ["B"])  # again (the cursor stays on eat), but now it's full
+    assert actions == ["eat"]
+    assert g.scene is not None  # the refusal plays instead
+    t = after(t, anim.REFUSE_EAT)
+    g.update(t, ["C", "B", "A", "C"])  # cancel, B with nothing highlighted, move, cancel
+    assert actions == ["eat"]
     presses = ["A"] * (MENU_ITEMS.index("stats") + 1) + ["B"]
-    g.update(4.0, presses)
+    g.update(t + 1.0, presses)
     assert g.page == PAGE_STATS
-    assert actions == ["eat", "eat"]  # opening the stats page is not an action
+    assert actions == ["eat"]  # opening the stats page is not an action
 
 
 def test_on_action_fires_for_sleep_but_not_for_the_press_that_wakes():
@@ -127,7 +137,7 @@ def test_on_action_fires_for_sleep_but_not_for_the_press_that_wakes():
     g.update(1.0, ["A"] * (MENU_ITEMS.index("sleep") + 1) + ["B"])
     assert actions == ["sleep"]
     assert g.pet.asleep
-    g.update(2.0, ["B"])  # wakes it; the menu doesn't see the press
+    g.update(after(1.0, anim.SLEEP), ["B"])  # wakes it; the menu doesn't see the press
     assert not g.pet.asleep
     assert actions == ["sleep"]
 

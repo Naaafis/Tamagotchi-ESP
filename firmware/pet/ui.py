@@ -7,19 +7,27 @@ drawn outside it, and displayio paints uncovered pixels black.
 
 Layout (inside the square, Tamagotchi style):
     y   4.. 52   top icon row: eat, drink, sleep, play
-    y  56..184   pet, 16x16 art at 8x; reaction / "I want" bubble top-right
+    y  56..184   the stage, drawn at 8x: the pet (16x16 art) plus up to
+                 SLOT_COUNT 8x8 overlays (food, hearts, Z's, arrows, digits);
+                 the "I want" bubble sits top-right on the main screen
     y 188..236   bottom icon row: treat, affection, stats, [attention]
 The stats page covers the middle with six bars when open.
+
+During an animation or the game the stage shows game.scene.frame (see
+pet.anim for the frame format); otherwise the pet's pose. Measured on the
+board: a pet frame swap redraws 128x128 px in 50 ms (opaque palette; 60 ms
+transparent), moving it redraws the old and new rectangles (118 ms), an 8x8
+overlay costs 19 ms to show and 35 ms to move. So render() only touches
+displayio when a value actually changed, and hops are frames, not moves.
 """
 
 import displayio
 
-from pet import sprites
+from pet import anim, sprites
 from pet.state import (
     POSE_HAPPY,
     POSE_IDLE,
     POSE_SAD,
-    POSE_SLEEP,
     POSE_SULK,
     STAT_ACTION,
     STAT_MAX,
@@ -43,10 +51,9 @@ TOP_Y = 4
 BOTTOM_Y = SQUARE - 4 - ICON_PX  # 188
 MAX_MENU_ITEMS = ICONS_PER_ROW * 2 - 1  # last bottom slot is the attention icon
 
-PET_SCALE = 8
-PET_PX = sprites.PET_SIZE * PET_SCALE  # 128
-PET_X = (SQUARE - PET_PX) // 2  # 56
-PET_Y = (SQUARE - PET_PX) // 2  # 56
+STAGE_SCALE = 8
+STAGE_Y = (SQUARE - anim.STAGE_H * STAGE_SCALE) // 2  # 56
+SLOT_COUNT = anim.MAX_OVERLAYS
 
 BUBBLE_X = 186
 BUBBLE_Y = 58
@@ -64,7 +71,6 @@ ROW_BAR_X = 56
 
 BLINK_SECONDS = 0.5  # attention icon on/off
 IDLE_FRAME_SECONDS = 0.6
-SLEEP_FRAME_SECONDS = 1.0
 
 
 def bitmap_from_rows(rows, width):
@@ -114,6 +120,7 @@ class PetUI:
 
         self._icon_sheet = bitmap_from_rows(sprites.icon_sheet(), sprites.ICON_SIZE)
         self._pet_sheet = bitmap_from_rows(sprites.pet_sheet(), sprites.PET_SIZE)
+        self._fx_sheet = bitmap_from_rows(sprites.fx_sheet(), sprites.FX_SIZE)
 
         # Icon rows.
         self.icons_group = displayio.Group()
@@ -139,19 +146,36 @@ class PetUI:
         self._attention_group.hidden = True
         self.square.append(self._attention_group)
 
-        # The pet.
-        self._pet_palette = self._new_palette()
+        # The stage: the pet, then the overlay slots on top of it. The pet's
+        # palette is opaque (its background matches the stage, and a swap
+        # redraws 17% faster); overlays stay transparent so they can overlap.
+        self.stage = displayio.Group(scale=STAGE_SCALE, x=0, y=STAGE_Y)
         self._pet_grid = displayio.TileGrid(
             self._pet_sheet,
-            pixel_shader=self._pet_palette,
+            pixel_shader=self._new_palette(opaque=True),
             width=1,
             height=1,
             tile_width=sprites.PET_SIZE,
             tile_height=sprites.PET_SIZE,
+            x=anim.HOME_X,
+            y=anim.HOME_Y,
         )
-        self.pet_group = displayio.Group(scale=PET_SCALE, x=PET_X, y=PET_Y)
-        self.pet_group.append(self._pet_grid)
-        self.square.append(self.pet_group)
+        self.stage.append(self._pet_grid)
+        fx_palette = self._new_palette()
+        self._slots = []
+        for _ in range(SLOT_COUNT):
+            slot = displayio.TileGrid(
+                self._fx_sheet,
+                pixel_shader=fx_palette,
+                width=1,
+                height=1,
+                tile_width=sprites.FX_SIZE,
+                tile_height=sprites.FX_SIZE,
+            )
+            slot.hidden = True
+            self.stage.append(slot)
+            self._slots.append(slot)
+        self.square.append(self.stage)
 
         # Bubble next to the pet: what it is getting, or what it wants.
         self._bubble_grid = self._icon_grid(self._new_palette(), "eat")
@@ -179,13 +203,20 @@ class PetUI:
 
         # Change tracking so a render only touches displayio when something moved.
         self._cursor = -1
-        self._frame = -1
         self._bubble = None
         self._attention_shown = False
         self._page_open = False
-        self._frame_index = {}
+        self._pet_name = "idle0"  # what the pet grid shows now (None = hidden)
+        self._pet_x = anim.HOME_X
+        self._pet_y = anim.HOME_Y
+        self._pet_flip = False
+        self._slot_shown = [None] * SLOT_COUNT  # overlay tuple per slot, None = hidden
+        self._pet_index = {}
         for name in sprites.PET_FRAMES:
-            self._frame_index[name] = sprites.pet_frame_index(name)
+            self._pet_index[name] = sprites.pet_frame_index(name)
+        self._fx_index = {}
+        for name in sprites.FX_NAMES:
+            self._fx_index[name] = sprites.fx_index(name)
 
     # ---- building blocks ----
 
@@ -238,19 +269,63 @@ class PetUI:
         if self._cursor >= 0:
             self._style_icon(self._cursor, True)
 
-    def _frame_for(self, pet, now):
+    def _pose_frame(self, pet, now):
+        """Pet frame name for the main screen while awake."""
         pose = pet.pose
-        if pose == POSE_SLEEP:
-            name = "sleep0" if int(now / SLEEP_FRAME_SECONDS) % 2 == 0 else "sleep1"
-        elif pose == POSE_HAPPY:
-            name = "happy"
-        elif pose == POSE_SAD:
-            name = "sad"
-        elif pose == POSE_SULK:
-            name = "sulk"
-        else:  # POSE_IDLE
-            name = "idle0" if int(now / IDLE_FRAME_SECONDS) % 2 == 0 else "idle1"
-        return self._frame_index[name]
+        if pose == POSE_HAPPY:
+            return "happy"
+        if pose == POSE_SAD:
+            return "sad"
+        if pose == POSE_SULK:
+            return "sulk"
+        # POSE_IDLE: bob up and down
+        return "idle0" if int(now / IDLE_FRAME_SECONDS) % 2 == 0 else "idle1"
+
+    def _show_pet(self, name, x, y, flip):
+        grid = self._pet_grid
+        if name is None:
+            if self._pet_name is not None:
+                grid.hidden = True
+                self._pet_name = None
+            return
+        if name != self._pet_name:
+            grid[0] = self._pet_index[name]
+            if self._pet_name is None:
+                grid.hidden = False
+            self._pet_name = name
+        if x != self._pet_x:
+            grid.x = x
+            self._pet_x = x
+        if y != self._pet_y:
+            grid.y = y
+            self._pet_y = y
+        if flip != self._pet_flip:
+            grid.flip_x = flip
+            self._pet_flip = flip
+
+    def _show_overlays(self, overlays):
+        """Put each (name, x, y, flip) in a slot, in order; hide the slots left over."""
+        count = len(overlays)
+        for i in range(SLOT_COUNT):
+            want = overlays[i] if i < count else None
+            shown = self._slot_shown[i]
+            if want == shown:
+                continue
+            slot = self._slots[i]
+            if want is None:
+                slot.hidden = True
+            else:
+                if shown is None or want[0] != shown[0]:
+                    slot[0] = self._fx_index[want[0]]
+                if shown is None or want[1] != shown[1]:
+                    slot.x = want[1]
+                if shown is None or want[2] != shown[2]:
+                    slot.y = want[2]
+                if shown is None or want[3] != shown[3]:
+                    slot.flip_x = want[3]
+                if shown is None:
+                    slot.hidden = False
+            self._slot_shown[i] = want
 
     def _update_bars(self, pet):
         for i in range(len(STAT_NAMES)):
@@ -270,8 +345,9 @@ class PetUI:
     def render(self, game, now):
         """Bring the screen in line with the game state. Cheap when nothing changed."""
         pet = game.pet
+        scene = game.scene
 
-        night = pet.asleep
+        night = game.lights_off
         if night != self._night:
             self._apply_theme(night)
 
@@ -280,7 +356,7 @@ class PetUI:
             self._page_open = page_open
             self.page_group.hidden = not page_open
             self.icons_group.hidden = page_open
-            self.pet_group.hidden = page_open
+            self.stage.hidden = page_open
             self._attention_group.hidden = page_open or not self._attention_shown
             self._bubble_group.hidden = page_open or self._bubble is None
         if page_open:
@@ -295,12 +371,18 @@ class PetUI:
                 self._style_icon(cursor, True)
             self._cursor = cursor
 
-        frame = self._frame_for(pet, now)
-        if frame != self._frame:
-            self._pet_grid[0] = frame
-            self._frame = frame
+        if scene is not None:
+            f = scene.frame
+            self._show_pet(f[anim.PET], f[anim.X], f[anim.Y], f[anim.FLIP])
+            self._show_overlays(f[anim.OVERLAYS])
+        elif pet.asleep:  # lights off
+            self._show_pet("lie_sleep", anim.LIE_X, anim.HOME_Y, False)
+            self._show_overlays(anim.SLEEPING[int(now / anim.Z_SECONDS) % len(anim.SLEEPING)])
+        else:
+            self._show_pet(self._pose_frame(pet, now), anim.HOME_X, anim.HOME_Y, False)
+            self._show_overlays(())
 
-        if pet.asleep:
+        if scene is not None or pet.asleep:
             bubble = None
         elif pet.reaction is not None:
             bubble = pet.reaction

@@ -8,8 +8,8 @@ a player whose play(tune) returns at once: hw.board_esp32s3.Audio on the board
     sounds = Sounds(player)
     game.on_button = lambda name: sounds.button()
     game.on_attention = sounds.attention
-    game.on_action = lambda action: sounds.action()
     game.on_sulk = sounds.sulk
+    game.on_cue = sounds.cue          # animation beats: bites, refusals, hops, the game
     while True:
         game.update(now, presses)
         sounds.update(now, game.pet.attention)   # starts this frame's tune, if any
@@ -25,17 +25,51 @@ TICK = ((2637, 30),)
 # The attention icon turned on: three quick high beeps.
 CHIRP = ((3136, 60), (0, 50), (3136, 60), (0, 50), (3136, 60))
 
-# A care action was done: a rising major arpeggio (G6 B6 D7 G7).
+# The happy hop at the end of an accepted action, and winning the game: a
+# rising major arpeggio (G6 B6 D7 G7).
 HAPPY = ((1568, 70), (0, 20), (1976, 70), (0, 20), (2349, 70), (0, 20), (3136, 160))
 
-# The pet started sulking (a stat hit zero): low and falling (G4 Eb4 C4).
+# Each bite of food or a treat, and each sip.
+BLIP = ((1760, 40),)
+
+# The pet refuses food or drink: a falling "uh-uh".
+REFUSE = ((523, 110), (0, 50), (392, 160))
+
+# A round of the left/right game: guessed right, guessed wrong.
+MATCH = ((2637, 50), (0, 30), (3136, 100))
+MISS = ((330, 120), (0, 40), (262, 200))
+
+# The pet started sulking (a stat hit zero), and losing the game: low and
+# falling (G4 Eb4 C4).
 SAD = ((392, 200), (0, 40), (311, 200), (0, 40), (262, 500))
 
 # Power-on: a short two-note hello, so you can tell the sound works.
 STARTUP = ((2093, 60), (0, 30), (3136, 90))
 
-TUNES = (TICK, CHIRP, HAPPY, SAD, STARTUP)
-NAMES = {TICK: "tick", CHIRP: "chirp", HAPPY: "happy", SAD: "sad", STARTUP: "startup"}
+TUNES = (TICK, CHIRP, HAPPY, BLIP, REFUSE, MATCH, MISS, SAD, STARTUP)
+NAMES = {
+    TICK: "tick",
+    CHIRP: "chirp",
+    HAPPY: "happy",
+    BLIP: "blip",
+    REFUSE: "refuse",
+    MATCH: "match",
+    MISS: "miss",
+    SAD: "sad",
+    STARTUP: "startup",
+}
+
+# The tune for each animation cue (pet.anim, pet.minigame).
+CUES = {
+    "bite": BLIP,
+    "sip": BLIP,
+    "refuse": REFUSE,
+    "happy": HAPPY,
+    "match": MATCH,
+    "miss": MISS,
+    "win": HAPPY,
+    "lose": SAD,
+}
 
 # While the pet keeps asking for attention, chirp again this often. Counted
 # from the last chirp or button press, so it doesn't nag someone who is
@@ -58,10 +92,10 @@ def duration_ms(tune):
 class Sounds:
     """Picks the tune for each game event and starts at most one per frame.
 
-    Wire the Game's hooks to button(), attention(), action() and sulk(), and
+    Wire the Game's hooks to button(), attention(), sulk() and cue(), and
     call update(now, attention) once per frame after game.update(). Within one
-    frame a tick never replaces a bigger sound (pressing B on "eat" plays the
-    jingle, not the tick), and any other sound replaces a pending tick. A new
+    frame a tick never replaces a bigger sound, and any other sound replaces
+    a pending tick. A new
     sound cuts off whatever is still playing. With mute set nothing reaches
     the player, but update() still reports what would have played.
     """
@@ -88,8 +122,11 @@ class Sounds:
         self.play(CHIRP)
         self._restart_reminder = True
 
-    def action(self):
-        self.play(HAPPY)
+    def cue(self, name):
+        """An animation beat; cues without a tune are silent."""
+        tune = CUES.get(name)
+        if tune is not None:
+            self.play(tune)
 
     def sulk(self):
         self.play(SAD)

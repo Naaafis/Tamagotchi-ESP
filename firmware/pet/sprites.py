@@ -1,11 +1,19 @@
-"""Placeholder 1-bit art as text rows. '#' is ink, '.' is background.
+"""1-bit art as text rows. '#' is ink, '.' is background.
 
-Pure data, no displayio: ui.py turns these into bitmaps. T10 replaces the art;
-keep the names, sizes and frame order and nothing else needs to change.
+Pure data, no displayio: ui.py turns these into bitmaps. Our own drawings in
+the style of the original's dot-matrix LCD. T10 can redraw any of it; keep
+the names and sizes and nothing else needs to change.
+
+Three sheets:
+    pet frames   16x16, drawn at 8x: the ghost in every pose
+    icons        12x12, drawn at 4x: menu icons, attention, the want bubble
+    fx           8x8, drawn at 8x next to the pet: food, cup, treat, hearts,
+                 sparkles, Z's, the game's arrow and score digits
 """
 
 PET_SIZE = 16
 ICON_SIZE = 12
+FX_SIZE = 8
 
 _BLANK16 = "................"
 
@@ -51,6 +59,12 @@ _HAPPY = (
     "................",
 )
 
+# Same smile one row higher: alternating with _HAPPY is the happy hop. Hops
+# are drawn into the frame instead of moving the sprite: on the board moving a
+# 128x128 sprite redraws its old and new rectangles (118 ms), a frame swap
+# redraws one (50-60 ms).
+_HAPPY_UP = _HAPPY[1:] + (_BLANK16,)
+
 _SAD = (
     "................",
     ".....######.....",
@@ -90,55 +104,120 @@ _SULK = (
     "................",
 )
 
-# Slumped one row down, eyes shut, a small z / big Z alternating.
-_SLEEP0 = (
-    ".............###",
-    "..............#.",
-    ".....######..###",
+# Side on, facing left (flip_x to face right): eats, and turns in the game.
+_SIDE = (
+    "................",
+    "......######....",
+    "....##########..",
+    "...############.",
+    "..#############.",
+    "..#..##########.",
+    "..#..##########.",
+    ".##############.",
+    ".##############.",
+    "....###########.",
+    ".##############.",
+    "..#############.",
+    "..##############",
+    "...####.####..##",
+    "................",
+    "................",
+)
+
+# Side on with the mouth wide open: the bite.
+_SIDE_EAT = _SIDE[:8] + (
+    "....###########.",
+    "......#########.",
+    "....###########.",
+) + _SIDE[11:]
+
+# Eyes to one side and a frown, the whole body one column over: shaking its
+# head "no". flip_x swings it to the other side.
+_NO = (
+    "................",
+    "....######......",
+    "..##########....",
+    ".############...",
+    "##############..",
+    "#..###..######..",
+    "#..###..######..",
+    "##############..",
+    "##############..",
+    "##############..",
+    "#####....#####..",
+    "####.####.####..",
+    "##############..",
+    "##.####.####.#..",
+    "................",
+    "................",
+)
+
+# Eyes shut, mouth wide open.
+_YAWN = (
+    "................",
+    ".....######.....",
     "...##########...",
     "..############..",
     ".##############.",
     ".##############.",
     ".#...######...#.",
     ".##############.",
+    ".#####....#####.",
+    ".####......####.",
+    ".####......####.",
+    ".#####....#####.",
     ".##############.",
-    ".######..######.",
-    ".##############.",
-    ".##############.",
-    ".##############.",
+    ".##.####.####.#.",
+    "................",
+    "................",
+)
+
+# Lying down, squashed flat on the floor.
+_LIE = (_BLANK16,) * 8 + (
+    "....########....",
+    "..############..",
+    ".###..####..###.",
+    ".###..####..###.",
+    "################",
+    "################",
     ".##.####.####.#.",
     "................",
 )
 
-_SLEEP1 = (
-    "............####",
-    "..............#.",
-    ".....######.####",
-    "...##########...",
-    "..############..",
-    ".##############.",
+# Lying down, eyes shut: asleep.
+_LIE_SLEEP = _LIE[:10] + (
     ".##############.",
     ".#...######...#.",
-    ".##############.",
-    ".##############.",
-    ".######..######.",
-    ".##############.",
-    ".##############.",
-    ".##############.",
-    ".##.####.####.#.",
-    "................",
-)
+) + _LIE[12:]
 
 # Frame order in the pet sprite sheet. ui.py looks frames up by name.
-PET_FRAMES = ("idle0", "idle1", "happy", "sad", "sulk", "sleep0", "sleep1")
+PET_FRAMES = (
+    "idle0",
+    "idle1",
+    "happy",
+    "happy_up",
+    "sad",
+    "sulk",
+    "side",
+    "side_eat",
+    "no",
+    "yawn",
+    "lie",
+    "lie_sleep",
+)
 _PET_ART = {
     "idle0": _IDLE0,
     "idle1": _IDLE1,
     "happy": _HAPPY,
+    "happy_up": _HAPPY_UP,
     "sad": _SAD,
     "sulk": _SULK,
-    "sleep0": _SLEEP0,
-    "sleep1": _SLEEP1,
+    "side": _SIDE,
+    "side_eat": _SIDE_EAT,
+    "no": _NO,
+    "yawn": _YAWN,
+    "lie": _LIE,
+    "lie_sleep": _LIE_SLEEP,
 }
 
 _EAT = (  # burger
@@ -276,6 +355,272 @@ _ICON_ART = {
 }
 
 
+# ---- fx: 8x8, drawn at 8x beside the pet ------------------------------------
+# Props sit on the floor: their ink ends on row 6, and the stage puts them at
+# y = 7 so it lines up with the pet's feet. Bites come off the right side,
+# where the pet stands.
+
+_FX_ART = {
+    "food0": (  # burger
+        "........",
+        "..####..",
+        ".######.",
+        "########",
+        "........",
+        "########",
+        ".######.",
+        "........",
+    ),
+    "food1": (
+        "........",
+        "..###...",
+        ".#####..",
+        "#####...",
+        "........",
+        "#####...",
+        ".###....",
+        "........",
+    ),
+    "food2": (
+        "........",
+        "..#.....",
+        ".##.....",
+        "###.....",
+        "........",
+        "##......",
+        ".#......",
+        "........",
+    ),
+    "cup0": (  # full
+        "........",
+        "#......#",
+        "########",
+        "########",
+        "########",
+        ".######.",
+        "..####..",
+        "........",
+    ),
+    "cup1": (
+        "........",
+        "#......#",
+        "#......#",
+        "########",
+        "########",
+        ".######.",
+        "..####..",
+        "........",
+    ),
+    "cup2": (
+        "........",
+        "#......#",
+        "#......#",
+        "#......#",
+        "########",
+        ".######.",
+        "..####..",
+        "........",
+    ),
+    "cup3": (  # empty
+        "........",
+        "#......#",
+        "#......#",
+        "#......#",
+        "#......#",
+        ".#....#.",
+        "..####..",
+        "........",
+    ),
+    "pumpkin0": (  # jack-o'-lantern candy
+        "...##...",
+        ".######.",
+        "########",
+        "#.####.#",
+        "########",
+        "#.#..#.#",
+        ".######.",
+        "........",
+    ),
+    "pumpkin1": (
+        "...##...",
+        ".#####..",
+        "#####...",
+        "#.##....",
+        "#####...",
+        "#.#.#...",
+        ".#####..",
+        "........",
+    ),
+    "pumpkin2": (
+        "...#....",
+        ".##.....",
+        "###.....",
+        "#.#.....",
+        "###.....",
+        "#.#.....",
+        ".##.....",
+        "........",
+    ),
+    "heart": (
+        "........",
+        ".##.##..",
+        "#######.",
+        "#######.",
+        ".#####..",
+        "..###...",
+        "...#....",
+        "........",
+    ),
+    "sparkle0": (
+        "....#...",
+        "....#...",
+        "..#.#.#.",
+        "...###..",
+        ".#######",
+        "...###..",
+        "..#.#.#.",
+        "....#...",
+    ),
+    "sparkle1": (
+        "........",
+        ".#...#..",
+        "..#.#...",
+        "...#....",
+        "..#.#...",
+        ".#...#..",
+        "........",
+        "........",
+    ),
+    "z_small": (
+        "........",
+        "........",
+        "........",
+        ".####...",
+        "...#....",
+        "..#.....",
+        ".####...",
+        "........",
+    ),
+    "z_big": (
+        "######..",
+        "....#...",
+        "...#....",
+        "..#.....",
+        ".#......",
+        "######..",
+        "........",
+        "........",
+    ),
+    "arrow": (  # points left; flip_x points right. 6 wide, so it clears the pet
+        "........",
+        "..#.....",
+        ".##.....",
+        "######..",
+        "######..",
+        ".##.....",
+        "..#.....",
+        "........",
+    ),
+    "d0": (
+        ".###....",
+        "#...#...",
+        "#..##...",
+        "#.#.#...",
+        "##..#...",
+        "#...#...",
+        ".###....",
+        "........",
+    ),
+    "d1": (
+        "..#.....",
+        ".##.....",
+        "..#.....",
+        "..#.....",
+        "..#.....",
+        "..#.....",
+        ".###....",
+        "........",
+    ),
+    "d2": (
+        ".###....",
+        "#...#...",
+        "....#...",
+        "...#....",
+        "..#.....",
+        ".#......",
+        "#####...",
+        "........",
+    ),
+    "d3": (
+        "#####...",
+        "...#....",
+        "..#.....",
+        "...#....",
+        "....#...",
+        "#...#...",
+        ".###....",
+        "........",
+    ),
+    "d4": (
+        "...#....",
+        "..##....",
+        ".#.#....",
+        "#..#....",
+        "#####...",
+        "...#....",
+        "...#....",
+        "........",
+    ),
+    "d5": (
+        "#####...",
+        "#.......",
+        "####....",
+        "....#...",
+        "....#...",
+        "#...#...",
+        ".###....",
+        "........",
+    ),
+    "slash": (
+        "....#...",
+        "....#...",
+        "...#....",
+        "..#.....",
+        ".#......",
+        "#.......",
+        "#.......",
+        "........",
+    ),
+}
+
+# Tile order in the fx sprite sheet.
+FX_NAMES = (
+    "food0",
+    "food1",
+    "food2",
+    "cup0",
+    "cup1",
+    "cup2",
+    "cup3",
+    "pumpkin0",
+    "pumpkin1",
+    "pumpkin2",
+    "heart",
+    "sparkle0",
+    "sparkle1",
+    "z_small",
+    "z_big",
+    "arrow",
+    "d0",
+    "d1",
+    "d2",
+    "d3",
+    "d4",
+    "d5",
+    "slash",
+)
+
+
 def pet_sheet():
     """All pet frames stacked vertically, PET_SIZE rows each, in PET_FRAMES order."""
     rows = []
@@ -298,3 +643,15 @@ def pet_frame_index(name):
 
 def icon_index(name):
     return ICON_NAMES.index(name)
+
+
+def fx_sheet():
+    """All fx tiles stacked vertically, FX_SIZE rows each, in FX_NAMES order."""
+    rows = []
+    for name in FX_NAMES:
+        rows.extend(_FX_ART[name])
+    return rows
+
+
+def fx_index(name):
+    return FX_NAMES.index(name)
