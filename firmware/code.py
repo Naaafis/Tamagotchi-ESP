@@ -20,11 +20,14 @@ bounce shows up as a few-ms hold or gap), every attention event, action,
 cue, sulk and sound (except the tick), any loop iteration slower than
 SLOW_FRAME_MS, and a status line every STATUS_SECONDS with the pet's stats,
 the slowest frame and the longest gap between two frames (which includes the
-display's background refreshes).
+display's background refreshes). At boot it prints the reset reason and, if
+safemode.py just brought the board back from a crash, which crash.
 """
 
 import gc
 import time
+
+import microcontroller
 
 from hw.board_esp32s3 import (
     HEIGHT,
@@ -197,6 +200,20 @@ log(
     )
 )
 log("pet: " + game.pet.summary())
+
+CRASH_NVM_BYTES = 24  # where safemode.py leaves the name of the crash it recovered from
+
+
+def report_reset():
+    """Say how this boot came about, and whether safemode.py just recovered from a crash."""
+    log("reset reason: " + str(microcontroller.cpu.reset_reason).split(".")[-1])
+    note = bytes(microcontroller.nvm[0:CRASH_NVM_BYTES]).rstrip(b"\x00")
+    if note:
+        log("recovered from safe mode: " + note.decode("ascii", "replace"))
+        microcontroller.nvm[0:CRASH_NVM_BYTES] = bytes(CRASH_NVM_BYTES)
+
+
+report_reset()
 sounds.play(sound.STARTUP)
 
 _idle_ms = int(IDLE_SECONDS * 1000)
