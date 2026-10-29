@@ -20,14 +20,22 @@ bounce shows up as a few-ms hold or gap), every attention event, action,
 cue, sulk and sound (except the tick), any loop iteration slower than
 SLOW_FRAME_MS, and a status line every STATUS_SECONDS with the pet's stats,
 the slowest frame and the longest gap between two frames (which includes the
-display's background refreshes). At boot it prints the reset reason and, if
-safemode.py just brought the board back from a crash, which crash.
+display's background refreshes). At boot it prints the reset reason, why this
+run started, and, if safemode.py just brought the board back from a crash,
+which crash.
+
+If anything in the main loop raises, the traceback goes to serial and the
+board soft-reloads into a fresh pet RESTART_DELAY_SECONDS later (the boot
+line then says "run reason: SUPERVISOR_RELOAD"). Crashes below Python, which drop the
+board into safe mode, are safemode.py's job.
 """
 
 import gc
 import time
+import traceback
 
 import microcontroller
+import supervisor
 
 from hw.board_esp32s3 import (
     HEIGHT,
@@ -206,7 +214,9 @@ CRASH_NVM_BYTES = 24  # where safemode.py leaves the name of the crash it recove
 
 def report_reset():
     """Say how this boot came about, and whether safemode.py just recovered from a crash."""
-    log("reset reason: " + str(microcontroller.cpu.reset_reason).split(".")[-1])
+    reset = str(microcontroller.cpu.reset_reason).split(".")[-1]
+    run = str(supervisor.runtime.run_reason).split(".")[-1]  # SUPERVISOR_RELOAD: the loop below restarted us
+    log("reset reason: %s, run reason: %s" % (reset, run))
     note = bytes(microcontroller.nvm[0:CRASH_NVM_BYTES]).rstrip(b"\x00")
     if note:
         log("recovered from safe mode: " + note.decode("ascii", "replace"))
@@ -232,81 +242,93 @@ _gc_interval_ms = GC_INTERVAL_SECONDS * 1000
 _last_gc_ms = -_gc_interval_ms  # so the first idle collect isn't held back
 _update_ms = 0
 
-while True:
-    frame_start = clock_ms()
-    if _prev_frame_start is not None and frame_start - _prev_frame_start > _longest_gap_ms:
-        _longest_gap_ms = frame_start - _prev_frame_start
-    _prev_frame_start = frame_start
+RESTART_DELAY_SECONDS = 1.0  # after an error in the loop, before starting over
 
-    presses = []
-    for name, pressed, ticks in button_events():
-        # Stamped with the scanner's time, not ours, so the gap between the
-        # press and release lines is the real hold time.
-        if pressed:
-            text = name + " press"
-            if name in _release_ticks:
-                text += " (%d ms after its last release)" % ticks_diff(ticks, _release_ticks[name])
-            _down_ticks[name] = ticks
-            presses.append(name)
-            if name not in _held:
-                _held.append(name)
-        else:
-            text = name + " release"
-            if name in _down_ticks:
-                text += " (held %d ms)" % ticks_diff(ticks, _down_ticks[name])
-            _release_ticks[name] = ticks
-            if name in _held:
-                _held.remove(name)
-        log(text, ticks_to_clock(ticks))
+try:
+    while True:
+        frame_start = clock_ms()
+        if _prev_frame_start is not None and frame_start - _prev_frame_start > _longest_gap_ms:
+            _longest_gap_ms = frame_start - _prev_frame_start
+        _prev_frame_start = frame_start
 
-    game.update(frame_start / 1000.0, presses, _held)
-    tune = sounds.update(frame_start / 1000.0, game.pet.attention)
-    if tune is not None and tune != sound.TICK:
-        log("sound: %s (%d ms)" % (sound.name(tune), sound.duration_ms(tune)))
-    _update_ms = clock_ms() - frame_start
+        presses = []
+        for name, pressed, ticks in button_events():
+            # Stamped with the scanner's time, not ours, so the gap between the
+            # press and release lines is the real hold time.
+            if pressed:
+                text = name + " press"
+                if name in _release_ticks:
+                    text += " (%d ms after its last release)" % ticks_diff(ticks, _release_ticks[name])
+                _down_ticks[name] = ticks
+                presses.append(name)
+                if name not in _held:
+                    _held.append(name)
+            else:
+                text = name + " release"
+                if name in _down_ticks:
+                    text += " (held %d ms)" % ticks_diff(ticks, _down_ticks[name])
+                _release_ticks[name] = ticks
+                if name in _held:
+                    _held.remove(name)
+            log(text, ticks_to_clock(ticks))
 
-    if game.playing:
-        brighten("game")  # stays up for the whole game
-    lights_off = game.lights_off
-    if lights_off and not _lights_were_off:
-        _last_activity_ms = frame_start - _idle_ms  # lights out: dim now, not in 15 s
-    _lights_were_off = lights_off
-    if backlight.target > RESTING_LEVEL and frame_start - _last_activity_ms >= _idle_ms:
-        backlight.fade_to(RESTING_LEVEL, FADE_DOWN_SECONDS)
-        log("backlight down (%s)" % ("lights off" if lights_off else "idle %gs" % IDLE_SECONDS))
-    backlight.update()
+        game.update(frame_start / 1000.0, presses, _held)
+        tune = sounds.update(frame_start / 1000.0, game.pet.attention)
+        if tune is not None and tune != sound.TICK:
+            log("sound: %s (%d ms)" % (sound.name(tune), sound.duration_ms(tune)))
+        _update_ms = clock_ms() - frame_start
 
-    if frame_start - _last_activity_ms >= _gc_idle_ms and frame_start - _last_gc_ms >= _gc_interval_ms:
-        _last_gc_ms = frame_start
-        collect_garbage("idle")
+        if game.playing:
+            brighten("game")  # stays up for the whole game
+        lights_off = game.lights_off
+        if lights_off and not _lights_were_off:
+            _last_activity_ms = frame_start - _idle_ms  # lights out: dim now, not in 15 s
+        _lights_were_off = lights_off
+        if backlight.target > RESTING_LEVEL and frame_start - _last_activity_ms >= _idle_ms:
+            backlight.fade_to(RESTING_LEVEL, FADE_DOWN_SECONDS)
+            log("backlight down (%s)" % ("lights off" if lights_off else "idle %gs" % IDLE_SECONDS))
+        backlight.update()
 
-    frame_ms = clock_ms() - frame_start
-    _frames += 1
-    if frame_ms > _slowest_ms:
-        _slowest_ms = frame_ms
-    if frame_ms > SLOW_FRAME_MS:
-        _slow_frames += 1
-        log("slow frame: %d ms (game.update %d ms)" % (frame_ms, _update_ms))
+        if frame_start - _last_activity_ms >= _gc_idle_ms and frame_start - _last_gc_ms >= _gc_interval_ms:
+            _last_gc_ms = frame_start
+            collect_garbage("idle")
 
-    if frame_start >= _next_status_ms:
-        _next_status_ms += STATUS_SECONDS * 1000
-        log(
-            "status: %s | backlight %d%% | %d frames, slowest %d ms, %d over %d ms, longest gap %d ms"
-            % (
-                game.pet.summary(),
-                int(backlight.brightness * 100 + 0.5),
-                _frames,
-                _slowest_ms,
-                _slow_frames,
-                SLOW_FRAME_MS,
-                _longest_gap_ms,
+        frame_ms = clock_ms() - frame_start
+        _frames += 1
+        if frame_ms > _slowest_ms:
+            _slowest_ms = frame_ms
+        if frame_ms > SLOW_FRAME_MS:
+            _slow_frames += 1
+            log("slow frame: %d ms (game.update %d ms)" % (frame_ms, _update_ms))
+
+        if frame_start >= _next_status_ms:
+            _next_status_ms += STATUS_SECONDS * 1000
+            log(
+                "status: %s | backlight %d%% | %d frames, slowest %d ms, %d over %d ms, longest gap %d ms"
+                % (
+                    game.pet.summary(),
+                    int(backlight.brightness * 100 + 0.5),
+                    _frames,
+                    _slowest_ms,
+                    _slow_frames,
+                    SLOW_FRAME_MS,
+                    _longest_gap_ms,
+                )
             )
-        )
-        _frames = 0
-        _slowest_ms = 0
-        _slow_frames = 0
-        _longest_gap_ms = 0
+            _frames = 0
+            _slowest_ms = 0
+            _slow_frames = 0
+            _longest_gap_ms = 0
 
-    remaining = FRAME_SECONDS - frame_ms / 1000.0
-    if remaining > 0:
-        time.sleep(remaining)
+        remaining = FRAME_SECONDS - frame_ms / 1000.0
+        if remaining > 0:
+            time.sleep(remaining)
+except Exception as e:  # not Ctrl-C or a reload: those are BaseExceptions and still get through
+    # A bug, or a hardware hiccup that surfaces as an exception: rather than
+    # stop on the traceback (a frozen screen in the costume), print it and
+    # start over with a fresh pet, like an unplug and replug. An error during
+    # setup above still stops, since it would only happen again.
+    log("error in the game loop, restarting in %g s:" % RESTART_DELAY_SECONDS)
+    traceback.print_exception(e)
+    time.sleep(RESTART_DELAY_SECONDS)
+    supervisor.reload()
