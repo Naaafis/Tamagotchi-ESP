@@ -42,6 +42,6 @@ Bottom row:
 
 ## If something goes wrong
 
-- **It restarts by itself** (screen flickers, hello sound, a fresh pet): a wire got jostled and the board crashed; it gets itself going again within a few seconds. Nothing to do, but if it keeps happening, check the jumpers.
+- **It restarts by itself** (screen flickers, hello sound, a fresh pet): a wire got jostled or the game hit a bug, and it started itself over within a few seconds. Nothing to do, but if it keeps happening, check the jumpers and tell Nafis.
 - **Screen blank or frozen, or the buttons do nothing:** unplug the power bank, wait 2 seconds, plug it back in. The pet starts fresh.
 - **No sound:** check the speaker wires at the amp. It still works without sound.
