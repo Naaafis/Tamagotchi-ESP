@@ -27,4 +27,4 @@ Status: `todo` · `in progress` · `review` · `blocked` · `done`
 | T20 | Death by UFO after ~10 min of sulking; hold middle 10 s for a new pet | 5 | T7 | Claude | done | [#6](https://github.com/Naaafis/Tamagotchi-ESP/pull/6) |
 | T21 | Pet art: Sprout replaces the ghost; gamepad Play icon | 4 | T8 | Claude | done | [#6](https://github.com/Naaafis/Tamagotchi-ESP/pull/6) |
 | T22 | `code.py` restarts itself after an error in the game loop instead of stopping on the traceback | 6 | T11 | Claude | review | [#7](https://github.com/Naaafis/Tamagotchi-ESP/pull/7) |
-| T23 | Hold right 10 s: sound off / back on | 5 | T11 | Claude | in progress | `task/T23-mute-hold` |
+| T23 | Hold right 10 s: sound off / back on | 5 | T11 | Claude | review | [#9](https://github.com/Naaafis/Tamagotchi-ESP/pull/9) |
