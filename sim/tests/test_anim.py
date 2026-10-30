@@ -24,6 +24,7 @@ for _n in range(len(anim.POOP_PILE) + 1):
     ALL_SETS["main with %d poops" % _n] = (anim.frame(0, "sad", x=anim.POOP_PET_X, overlays=anim.POOP_PILE[:_n]),)
 ALL_SETS["die"] = anim.DIE
 ALL_SETS["gone"] = (anim.frame(0, None, overlays=anim.GONE),)
+ALL_SETS["hatch"] = anim.HATCH
 
 
 def ink_box(rows):
@@ -164,7 +165,9 @@ def test_poops_pile_up_two_by_two_beside_the_pet():
     pile = anim.POOP_PILE
     assert len(pile) == 4
     assert pile[0][2] == pile[1][2] > pile[2][2] == pile[3][2]  # bottom row first
-    pet_right = anim.POOP_PET_X + ink_box(sprites.pet_sheet()[:16])[2]
+    sheet = sprites.pet_sheet()
+    poses = [sprites.pet_frame_index(p, c) for c in sprites.CHARACTERS for p in ("idle0", "idle1", "sad", "sulk")]
+    pet_right = anim.POOP_PET_X + max(ink_box(sheet[i * 16 : i * 16 + 16])[2] for i in poses)
     for _, x, y, _ in pile:
         for rows in sprites.POOP_FRAMES:
             assert x + ink_box(rows)[0] > pet_right + 1  # a gap between pet and poop
@@ -222,7 +225,7 @@ def run(g, start, seconds, presses=None):
 
 
 def game(**levels):
-    g = Game(now=0.0, build_ui=False)
+    g = Game(now=0.0, build_ui=False, hatch=False)
     for name, value in levels.items():
         g.pet.stats[name] = value
     return g

@@ -1,7 +1,7 @@
 """Poops, Clean, death by the UFO and the holds, inside the Game (firmware/pet/game.py)."""
 
 from pet import anim
-from pet.game import DEBUG_POOP_HOLD_SECONDS, MENU_ITEMS, RESET_HOLD_SECONDS, Game
+from pet.game import DEBUG_POOP_HOLD_SECONDS, MENU_ITEMS, MUTE_HOLD_SECONDS, RESET_HOLD_SECONDS, Game
 from pet.state import CLEAN, MAX_POOPS, STAT_MAX, STAT_NAMES, death_seconds
 
 
@@ -13,13 +13,14 @@ class Hooks:
         g.on_cue = lambda name: self.calls.append("cue " + name)
         g.on_death = lambda: self.calls.append("death")
         g.on_reset = lambda: self.calls.append("reset")
+        g.on_mute_toggle = lambda: self.calls.append("mute")
 
     def cues(self):
         return [c[4:] for c in self.calls if c.startswith("cue ")]
 
 
 def new_game():
-    g = Game(now=0.0, build_ui=False)
+    g = Game(now=0.0, build_ui=False, hatch=False)
     for name in STAT_NAMES:  # nothing needed, so only poops ask for attention
         g.pet.stats[name] = STAT_MAX
     g.update(0.0)
@@ -132,7 +133,7 @@ def test_holding_middle_ten_seconds_starts_a_new_pet():
     end = run(g, end, 0.5, ["B"])
     assert not g.pet.dead
     assert hooks.calls.count("reset") == 1
-    assert g.scene is None
+    assert g.hatching  # the new pet hatches
     run(g, end, RESET_HOLD_SECONDS + 1, ["B"])  # still the same hold: no second reset
     assert hooks.calls.count("reset") == 1
 
@@ -144,3 +145,43 @@ def test_reset_works_while_alive_too():
     run(g, 1.0, RESET_HOLD_SECONDS + 0.1, ["B"])
     assert hooks.calls.count("reset") == 1
     assert g.pet.poops == 0
+
+
+def test_holding_right_ten_seconds_toggles_the_sound_once_per_hold():
+    g, hooks = new_game()
+    g.update(1.0, ["C"], ["C"])
+    end = run(g, 1.0, MUTE_HOLD_SECONDS - 0.2, ["C"])
+    assert "mute" not in hooks.calls
+    end = run(g, end, 0.5, ["C"])
+    assert hooks.calls.count("mute") == 1
+    end = run(g, end, MUTE_HOLD_SECONDS + 1, ["C"])  # still the same hold
+    assert hooks.calls.count("mute") == 1
+    g.update(end + 0.05)  # released
+    g.update(end + 0.1, ["C"], ["C"])
+    run(g, end + 0.1, MUTE_HOLD_SECONDS + 0.1, ["C"])  # a new hold toggles it back
+    assert hooks.calls.count("mute") == 2
+
+
+def test_in_the_game_holding_right_quits_first_then_toggles_the_sound():
+    g, hooks = new_game()
+    now = 1.0
+    for button in select("play"):
+        now = round(now + 0.05, 2)
+        g.update(now, [button])
+    assert g.playing
+    now = round(now + 0.05, 2)
+    g.update(now, ["C"], ["C"])
+    end = run(g, now, 1.2, ["C"])
+    assert not g.playing
+    assert "mute" not in hooks.calls
+    run(g, end, MUTE_HOLD_SECONDS - 1.2 + 0.1, ["C"])
+    assert hooks.calls.count("mute") == 1
+
+
+def test_the_sound_toggles_after_death_too():
+    g, hooks = new_game()
+    now = die(g, hooks)
+    g.update(now + 0.05, ["C"], ["C"])
+    run(g, now + 0.05, MUTE_HOLD_SECONDS + 0.1, ["C"])
+    assert hooks.calls.count("mute") == 1
+    assert g.pet.dead

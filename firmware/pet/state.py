@@ -6,8 +6,9 @@ no displayio, no time module. The caller passes `now` in seconds to tick().
 Five stats run 0..STAT_MAX and drain while the pet is awake. When one drops to
 LOW_THRESHOLD the need shows and the attention flag goes on. At zero the pet
 sulks; it recovers as soon as it gets what it was missing, but a pet left
-sulking for DEATH_SULK_MINUTES (x DECAY_SCALE) dies. Holding the middle button
-starts a new one (pet.game).
+sulking for DEATH_SULK_MINUTES (x DECAY_SCALE) dies, and so does one nobody
+has pressed a button for in IDLE_DEATH_MINUTES (that clock is in pet.game).
+Holding the middle button starts a new one (pet.game).
 
 Every so often, and more likely soon after eating or drinking, the pet poops.
 Up to MAX_POOPS stay on screen until cleaned; while they are there the
@@ -82,6 +83,11 @@ DIRTY_DRAIN_PER_POOP = 0.5
 # DECAY_SCALE, so ~10 min at 3.3. Its needs only hit zero ~17 minutes after
 # the first ask, so that is about half an hour of ignoring it.
 DEATH_SULK_MINUTES = 3.0
+
+# Nobody pressed a button for this many minutes (real minutes, not scaled by
+# DECAY_SCALE) and it dies too, however it's doing. The clock doesn't run
+# while it sleeps. pet.game keeps this clock, since it sees the presses.
+IDLE_DEATH_MINUTES = 15.0
 
 # Other stats drain this much slower while the pet sleeps.
 SLEEP_DECAY_FACTOR = 0.5
@@ -302,13 +308,20 @@ class Pet:
             self.reaction = None
 
         if self._sulk_since is not None and now - self._sulk_since >= death_seconds():
-            self.dead = True
-            self.died = True
-            self.asleep = False
-            self.reaction = None
+            self.die()
 
         self._update_attention()
         return self.attention and not was
+
+    def die(self):
+        """It's gone (left sulking too long here, or left alone too long in pet.game)."""
+        if self.dead:
+            return
+        self.dead = True
+        self.died = True
+        self.asleep = False
+        self.reaction = None
+        self._update_attention()
 
     def _advance(self, t0, t1):
         """Drain (or, asleep, refill) the stats from t0 to t1 at a steady rate."""

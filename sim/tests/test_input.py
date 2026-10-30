@@ -36,7 +36,7 @@ def test_c_cancels_and_unknown_buttons_are_ignored():
 
 
 def game():
-    return Game(now=0.0, build_ui=False)
+    return Game(now=0.0, build_ui=False, hatch=False)
 
 
 def test_menu_lists_every_action_plus_stats():

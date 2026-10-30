@@ -11,7 +11,7 @@ from pet.ui import PetUI, bitmap_from_rows
 
 
 def test_art_rows_have_the_declared_width():
-    assert len(sprites.pet_sheet()) == sprites.PET_SIZE * len(sprites.PET_FRAMES)
+    assert len(sprites.pet_sheet()) == sprites.PET_SIZE * len(sprites.PET_FRAMES) * len(sprites.CHARACTERS)
     assert len(sprites.icon_sheet()) == sprites.ICON_SIZE * len(sprites.ICON_NAMES)
     assert len(sprites.fx_sheet()) == sprites.FX_SIZE * len(sprites.FX_NAMES)
     assert len(sprites.poop_sheet()) == sprites.FX_SIZE * len(sprites.POOP_FRAMES)
@@ -43,7 +43,7 @@ class Fixed:
 
 
 def test_ui_renders_through_every_state():
-    g = Game(now=0.0)
+    g = Game(now=0.0, hatch=False)
     assert g.root_group is not None
     ui = g.ui
     assert isinstance(ui, PetUI)
@@ -108,12 +108,13 @@ def all_frames():
     for score in range(minigame.ROUNDS + 1):
         frames.extend(minigame.score_frames(score))
     frames.extend(anim.DIE)
+    frames.extend(anim.HATCH)
     frames.append(anim.frame(0, None, overlays=anim.GONE))
     return frames
 
 
 def test_every_animation_and_game_frame_renders():
-    g = Game(now=0.0)
+    g = Game(now=0.0, hatch=False)
     ui = g.ui
     now = 1.0
     for f in all_frames():
@@ -121,7 +122,7 @@ def test_every_animation_and_game_frame_renders():
         g.update(now)
         assert ui._pet_name == f[anim.PET]
         if f[anim.PET] is not None:
-            assert ui._pet_grid[0] == sprites.pet_frame_index(f[anim.PET])
+            assert ui._pet_grid[0] == sprites.pet_frame_index(f[anim.PET], g.character)
             assert (ui._pet_grid.x, ui._pet_grid.y) == (f[anim.X], f[anim.Y])
             assert ui._pet_grid.flip_x == f[anim.FLIP]
         assert ui._pet_grid.hidden == (f[anim.PET] is None)
@@ -139,7 +140,7 @@ def test_every_animation_and_game_frame_renders():
 
 
 def test_poops_show_in_their_own_slots_and_the_sweep_wipes_them():
-    g = Game(now=0.0)
+    g = Game(now=0.0, hatch=False)
     ui = g.ui
     for _ in range(2):
         g.pet.poop(0.0)
@@ -170,7 +171,7 @@ def test_poops_show_in_their_own_slots_and_the_sweep_wipes_them():
 
 
 def test_dead_pet_shows_the_empty_sky():
-    g = Game(now=0.0)
+    g = Game(now=0.0, hatch=False)
     ui = g.ui
     g.pet.dead = True
     g.update(0.1)

@@ -27,7 +27,7 @@ class Hooks:
 
 
 def start(turns, fun=20):
-    g = Game(now=0.0, build_ui=False, rng=Turns(turns))
+    g = Game(now=0.0, build_ui=False, rng=Turns(turns), hatch=False)
     g.pet.stats["fun"] = fun
     hooks = Hooks(g)
     g.update(1.0, ["A"] * (MENU_ITEMS.index("play") + 1) + ["B"])
@@ -152,7 +152,7 @@ def test_holding_c_leaves_the_game_but_a_tap_does_not():
 
 
 def test_playing_flag_only_while_the_game_runs():
-    g = Game(now=0.0, build_ui=False, rng=Turns([0] * 5))
+    g = Game(now=0.0, build_ui=False, rng=Turns([0] * 5), hatch=False)
     assert not g.playing
     g.update(1.0, ["A"] * (MENU_ITEMS.index("play") + 1) + ["B"])
     assert g.playing

@@ -194,7 +194,8 @@ def clean_frames(poops):
 
 
 # ---- Death: the UFO -------------------------------------------------------------
-# Left sulking too long, it goes home to its planet: it droops and lies down,
+# Left sulking too long, or left alone too long (pet.game), it goes home to
+# its planet: it droops and lies down,
 # a saucer glides in overhead and shines its beam down, the pet floats up
 # into it, and it flies off with a twinkle.
 # The game then shows GONE (an empty stage, the tiny saucer up in the sky)
@@ -223,6 +224,34 @@ DIE = (
 )
 
 GONE = (fx("ufo_tiny", 21, 1),)
+
+
+# ---- Hatching ----------------------------------------------------------------
+# Every new pet, at power-on and after the middle-button hold, starts as an
+# egg: it rests, wobbles, rests, wobbles faster, cracks, cracks wider, and
+# pops, a piece of shell flying off each side, and whichever critter hatched
+# (pet.game picks one) hops with a sparkle. The shell pieces stay clear of
+# the pet's columns 1-14, like the hearts.
+
+HATCH = (
+    frame(1000, "egg"),
+    frame(250, "egg_tilt", cue="wobble"),
+    frame(250, "egg"),
+    frame(250, "egg_tilt", flip=True, cue="wobble"),
+    frame(250, "egg"),
+    frame(600, "egg"),
+    frame(180, "egg_tilt", cue="wobble"),
+    frame(180, "egg_tilt", flip=True, cue="wobble"),
+    frame(180, "egg_tilt", cue="wobble"),
+    frame(180, "egg_tilt", flip=True, cue="wobble"),
+    frame(600, "egg_crack1", cue="crack"),
+    frame(700, "egg_crack2", cue="crack"),
+    frame(300, "happy", overlays=(fx("shell", 1, 2), fx("shell", 21, 2, True)), cue="hatch"),
+    frame(300, "happy_up", overlays=(fx("shell", 0, 0), fx("shell", 22, 0, True))),
+    frame(300, "happy", overlays=(fx("sparkle1", 22, 1),)),
+    frame(300, "happy_up", overlays=(fx("sparkle0", 22, 0),)),
+    frame(400, "happy"),
+)
 
 
 # What each menu action plays. Clean builds its frames from the poop count

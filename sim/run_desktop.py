@@ -144,14 +144,19 @@ def main():
         print("[%6.1fs] died: %s" % (time.monotonic() - start, game.pet.summary()))
 
     def on_reset():
-        print("[%6.1fs] reset: %s" % (time.monotonic() - start, game.pet.summary()))
+        print("[%6.1fs] reset: %s hatching, %s" % (time.monotonic() - start, game.character, game.pet.summary()))
         sounds.play(sound.STARTUP)
+
+    def on_mute_toggle():
+        muted = sounds.toggle_mute()
+        print("[%6.1fs] sound %s" % (time.monotonic() - start, "off" if muted else "on"))
 
     game.on_action = on_action
     game.on_cue = on_cue
     game.on_sulk = on_sulk
     game.on_death = on_death
     game.on_reset = on_reset
+    game.on_mute_toggle = on_mute_toggle
     sounds.play(sound.STARTUP)
 
     # Same as firmware/code.py on the board; the scaling is pygame's, not displayio's.
