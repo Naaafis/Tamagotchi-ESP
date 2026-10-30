@@ -11,8 +11,10 @@ tick on every press, a three-beep chirp when the pet starts asking for
 attention and again every pet.sound.REMINDER_SECONDS while it keeps asking,
 the animations' cues (a blip per bite or sip, a double tone when it refuses,
 the jingle as it hops, the game's match/miss/win/lose), a low sad tune when
-it starts sulking, and a short hello at power-on. The tunes themselves are in
-pet/sound.py.
+it starts sulking, and a short hello at power-on. Holding the right button
+10 s (pet.game.MUTE_HOLD_SECONDS) turns the sound off with a falling bye, and
+again brings it back with the hello; a restart or replug brings it back too.
+The tunes themselves are in pet/sound.py.
 
 Serial prints every press and release stamped with the keypad scanner's own
 time, with the hold time and the gap since that button's last release (a
@@ -54,7 +56,7 @@ from pet.game import Game
 # ---- Tuning knobs -----------------------------------------------------------
 
 VOLUME = 0.5  # speaker loudness, 0.0-1.0 (square-wave amplitude into the amp)
-MUTE = False  # True = no sound at all; everything else works the same
+MUTE = False  # True = start with no sound; everything else works the same (holding right 10 s toggles it)
 
 RESTING_LEVEL = 0.15  # backlight while nobody is playing (0.0-1.0)
 BRIGHT_LEVEL = 1.00  # backlight after a press or when the pet asks for something
@@ -186,6 +188,12 @@ def on_reset():
     sounds.play(sound.STARTUP)
 
 
+def on_mute_toggle():
+    muted = sounds.toggle_mute()
+    log("sound " + ("off" if muted else "on (volume %g)" % VOLUME))
+    brighten("sound " + ("off" if muted else "on"))
+
+
 game.on_button = on_button
 game.on_attention = on_attention
 game.on_action = on_action
@@ -193,6 +201,7 @@ game.on_cue = on_cue
 game.on_sulk = on_sulk
 game.on_death = on_death
 game.on_reset = on_reset
+game.on_mute_toggle = on_mute_toggle
 
 # ---- Main loop --------------------------------------------------------------
 

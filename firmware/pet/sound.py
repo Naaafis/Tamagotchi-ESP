@@ -10,6 +10,7 @@ a player whose play(tune) returns at once: hw.board_esp32s3.Audio on the board
     game.on_attention = sounds.attention
     game.on_sulk = sounds.sulk
     game.on_cue = sounds.cue          # animation beats: bites, refusals, hops, the game
+    game.on_mute_toggle = sounds.toggle_mute   # holding right
     while True:
         game.update(now, presses)
         sounds.update(now, game.pet.attention)   # starts this frame's tune, if any
@@ -52,10 +53,14 @@ MISS = ((330, 120), (0, 40), (262, 200))
 # falling (G4 Eb4 C4).
 SAD = ((392, 200), (0, 40), (311, 200), (0, 40), (262, 500))
 
-# Power-on: a short two-note hello, so you can tell the sound works.
+# Power-on: a short two-note hello, so you can tell the sound works. It also
+# plays when the sound comes back on.
 STARTUP = ((2093, 60), (0, 30), (3136, 90))
 
-TUNES = (TICK, CHIRP, HAPPY, BLIP, PLOP, FLUSH, REFUSE, MATCH, MISS, SAD, DIE, STARTUP)
+# The sound going off (holding right): a falling octave, the last thing it plays.
+MUTE = ((2093, 60), (0, 30), (1047, 150))
+
+TUNES = (TICK, CHIRP, HAPPY, BLIP, PLOP, FLUSH, REFUSE, MATCH, MISS, SAD, DIE, STARTUP, MUTE)
 NAMES = {
     TICK: "tick",
     CHIRP: "chirp",
@@ -69,6 +74,7 @@ NAMES = {
     MISS: "miss",
     SAD: "sad",
     STARTUP: "startup",
+    MUTE: "mute",
 }
 
 # The tune for each cue (pet.anim, pet.minigame, and the game's "plop").
@@ -113,6 +119,7 @@ class Sounds:
     a pending tick. A new
     sound cuts off whatever is still playing. With mute set nothing reaches
     the player, but update() still reports what would have played.
+    toggle_mute() turns it off or back on and says which.
     """
 
     def __init__(self, player, mute=False, reminder_seconds=REMINDER_SECONDS):
@@ -145,6 +152,21 @@ class Sounds:
 
     def sulk(self):
         self.play(SAD)
+
+    def toggle_mute(self):
+        """Sound off, or back on; returns the new mute.
+
+        Going off plays MUTE right away as the last sound and drops anything
+        else asked for this frame; coming back on plays the startup hello at
+        the end of the frame. Either way you can hear which it was.
+        """
+        self.mute = not self.mute
+        self._tune = None
+        if self.mute:
+            self.player.play(MUTE)
+        else:
+            self.play(STARTUP)
+        return self.mute
 
     def update(self, now, attention):
         """Repeat the chirp while attention stays on, then start this frame's tune.

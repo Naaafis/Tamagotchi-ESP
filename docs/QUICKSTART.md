@@ -10,7 +10,7 @@ Plug the power bank into the board's USB cable. After a second or two the screen
 |---|---|---|
 | **Left** | move to the next icon | 3 s: make it poop now (for showing people) |
 | **Middle** | select the icon | 10 s: start a new pet (works anytime, even after it's gone) |
-| **Right** | back / close | 1 s in the game: quit the game |
+| **Right** | back / close | 1 s in the game: quit the game. 10 s: sound off (a falling "bye"), or back on (the hello) |
 
 Any button wakes it up while it's asleep.
 
@@ -44,4 +44,4 @@ Bottom row:
 
 - **It restarts by itself** (screen flickers, hello sound, a fresh pet): a wire got jostled or the game hit a bug, and it started itself over within a few seconds. Nothing to do, but if it keeps happening, check the jumpers and tell Nafis.
 - **Screen blank or frozen, or the buttons do nothing:** unplug the power bank, wait 2 seconds, plug it back in. The pet starts fresh.
-- **No sound:** check the speaker wires at the amp. It still works without sound.
+- **No sound:** it may have been turned off: hold right for 10 seconds until the hello plays (unplugging and replugging also turns it back on). Still nothing? Check the speaker wires at the amp. It works fine without sound.

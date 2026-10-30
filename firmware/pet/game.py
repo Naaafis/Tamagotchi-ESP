@@ -12,6 +12,8 @@ use are dropped, not queued.
 
 Holding the middle button RESET_HOLD_SECONDS starts a new pet, dead or alive.
 Holding the left button DEBUG_POOP_HOLD_SECONDS makes it poop now (for testing).
+Holding the right button MUTE_HOLD_SECONDS asks for the sound to go off or
+back on (on_mute_toggle; the caller owns the sound).
 
 Hooks for sound and backlight (no-ops unless the caller sets them; the
 board's code.py wires them to the speaker and backlight):
@@ -25,6 +27,8 @@ board's code.py wires them to the speaker and backlight):
                                "win", "lose", "die"), and "plop" when a poop appears
     game.on_death()            called once when the pet dies
     game.on_reset()            called after holding the middle button starts a new pet
+    game.on_mute_toggle()      called once per hold when the right button has been held
+                               MUTE_HOLD_SECONDS: turn the sound off, or back on
 """
 
 import random
@@ -41,6 +45,7 @@ PAGE_STATS = "stats"
 
 RESET_HOLD_SECONDS = 10.0  # middle button: start a new pet
 DEBUG_POOP_HOLD_SECONDS = 3.0  # left button: poop now (None turns it off)
+MUTE_HOLD_SECONDS = 10.0  # right button: sound off / back on (in the game, 1 s of it already quits)
 
 
 def _noop(*args):
@@ -61,6 +66,7 @@ class Game:
         self.on_cue = _noop
         self.on_death = _noop
         self.on_reset = _noop
+        self.on_mute_toggle = _noop
         self._sulking = self.pet.sulking
         self._down_since = {}  # button -> when it was pressed, while it is held
         self._hold_done = []  # buttons whose hold already did its thing this press
@@ -96,7 +102,8 @@ class Game:
         """Advance the clock, apply button presses, redraw. Call every loop.
 
         events are this frame's presses; held is the buttons down right now
-        (for the holds: C leaves the game, middle resets, left forces a poop).
+        (for the holds: C leaves the game and toggles the sound, middle
+        resets, left forces a poop).
         """
         pet = self.pet
         if pet.tick(now):
@@ -149,6 +156,8 @@ class Game:
                 if self.pet.attention and not was:
                     self.on_attention()
                 self.cue("plop")
+        if self._held_once(input.C, MUTE_HOLD_SECONDS, now):
+            self.on_mute_toggle()
 
     def _die(self, now):
         self.menu.clear()

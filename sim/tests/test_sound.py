@@ -3,12 +3,13 @@
 import pytest
 
 from pet import sound
-from pet.game import MENU_ITEMS, Game
+from pet.game import MENU_ITEMS, MUTE_HOLD_SECONDS, Game
 from pet.sound import (
     BLIP,
     CHIRP,
     CUES,
     HAPPY,
+    MUTE,
     REFUSE,
     REMINDER_SECONDS,
     SAD,
@@ -194,3 +195,49 @@ def test_game_events_play_the_right_tunes():
     count = len(rec.played)
     step(11.0 + REMINDER_SECONDS)  # still asking: reminder chirp
     assert rec.played[count:] == [CHIRP]
+
+
+def test_toggle_mute_says_bye_then_goes_quiet_and_comes_back_with_the_hello():
+    rec = Recorder()
+    s = Sounds(rec)
+    s.attention()  # asked for this frame, then the sound goes off
+    assert s.toggle_mute() is True
+    assert rec.played == [MUTE]  # right away, and the chirp is dropped
+    assert s.update(0.0, False) is None
+    s.button()
+    s.update(1.0, False)
+    assert rec.played == [MUTE]
+    assert s.toggle_mute() is False
+    s.update(2.0, False)
+    assert rec.played == [MUTE, STARTUP]
+    s.button()
+    s.update(3.0, False)
+    assert rec.played == [MUTE, STARTUP, TICK]
+
+
+def test_holding_right_mutes_and_unmutes_the_game():
+    g = Game(now=0.0, build_ui=False)
+    rec = Recorder()
+    s = Sounds(rec)
+    g.on_button = lambda name: s.button()
+    g.on_mute_toggle = s.toggle_mute
+
+    def hold_c(start):
+        now = start
+        g.update(now, ["C"], ["C"])
+        s.update(now, False)
+        while now < start + MUTE_HOLD_SECONDS + 0.1:
+            now = round(now + 0.05, 2)
+            g.update(now, (), ["C"])
+            s.update(now, False)
+        g.update(now + 0.05)  # released
+        s.update(now + 0.05, False)
+        return now + 0.05
+
+    end = hold_c(1.0)
+    assert rec.played == [TICK, MUTE]
+    g.update(end + 0.05, ["A"])
+    s.update(end + 0.05, False)
+    assert rec.played == [TICK, MUTE]  # muted: no tick
+    hold_c(end + 0.1)
+    assert rec.played == [TICK, MUTE, STARTUP]
