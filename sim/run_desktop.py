@@ -144,7 +144,7 @@ def main():
         print("[%6.1fs] died: %s" % (time.monotonic() - start, game.pet.summary()))
 
     def on_reset():
-        print("[%6.1fs] reset: %s" % (time.monotonic() - start, game.pet.summary()))
+        print("[%6.1fs] reset: %s hatching, %s" % (time.monotonic() - start, game.character, game.pet.summary()))
         sounds.play(sound.STARTUP)
 
     def on_mute_toggle():

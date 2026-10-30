@@ -16,7 +16,8 @@ The stats page covers the middle with six bars when open: the five stats and
 how clean it is.
 
 During an animation or the game the stage shows game.scene.frame (see
-pet.anim for the frame format); otherwise the pet's pose. Measured on the
+pet.anim for the frame format); otherwise the pet's pose, in game.character's
+block of the pet sheet (every critter is in it). Measured on the
 board: a pet frame swap redraws 128x128 px in 50 ms (opaque palette; 60 ms
 transparent), moving it redraws the old and new rectangles (118 ms), an 8x8
 overlay costs 19 ms to show and 35 ms to move. So render() only touches
@@ -251,6 +252,8 @@ class PetUI:
         self._attention_shown = False
         self._page_open = False
         self._pet_name = "idle0"  # what the pet grid shows now (None = hidden)
+        self._character = sprites.CHARACTERS[0]  # whose frames the pet grid shows
+        self._pet_offset = 0  # that critter's first tile in the pet sheet
         self._pet_x = anim.HOME_X
         self._pet_y = anim.HOME_Y
         self._pet_flip = False
@@ -335,7 +338,7 @@ class PetUI:
                 self._pet_name = None
             return
         if name != self._pet_name:
-            grid[0] = self._pet_index[name]
+            grid[0] = self._pet_offset + self._pet_index[name]
             if self._pet_name is None:
                 grid.hidden = False
             self._pet_name = name
@@ -459,6 +462,11 @@ class PetUI:
                 self._style_icon(cursor, True)
             self._cursor = cursor
 
+        if game.character != self._character:  # a new pet hatched as someone else
+            self._character = game.character
+            self._pet_offset = sprites.pet_frame_index(sprites.PET_FRAMES[0], game.character)
+            if self._pet_name is not None:
+                self._pet_name = ""  # no frame has this name: the next _show_pet redraws
         if scene is not None:
             f = scene.frame
             self._show_pet(f[anim.PET], f[anim.X], f[anim.Y], f[anim.FLIP])

@@ -31,8 +31,8 @@ Christina goes as a Tamagotchi for Halloween. A screen on her chest shows a pixe
 - **Attention:** when a need is low, the attention icon lights, the speaker beeps, and the backlight brightens.
 - **Backlight:** on by default at low brightness (~10-15%), brightens on events and button presses, then fades back.
 - **Speed:** stats should decay fast enough that people at a party see the pet ask for things every few minutes (`DECAY_SCALE` at the top of `pet/state.py`: first ask ~8 min, a poop every ~6-10 min).
-- **Death:** neglect kills it. Once a stat hits zero it sulks; left sulking ~10 minutes, a UFO takes it away. Holding the middle button 10 s starts a new pet anytime, dead or alive. (Holding left 3 s makes it poop now, for testing.) Holding right 10 s turns the sound off or back on; a restart always brings it back.
-- **Pet art:** our own 1-bit drawings in the original's style (Sprout, a round critter with a leaf on top). No Bandai characters or sprites.
+- **Death:** neglect kills it. Once a stat hits zero it sulks; left sulking ~10 minutes, a UFO takes it away. So does 15 minutes without a single button press (`IDLE_DEATH_MINUTES` in `pet/state.py`; the clock waits while it sleeps). Holding the middle button 10 s starts a new pet anytime, dead or alive. (Holding left 3 s makes it poop now, for testing.) Holding right 10 s turns the sound off or back on; a restart always brings it back.
+- **Pet art:** our own 1-bit drawings in the original's style. Every new pet hatches from an egg (~6 s) as one of five critters at random, never the same one twice in a row: Sprout (a leaf on top), Dabble (big duck lips), Ribbon (a big bow, lashes, a little dress), Heartlet (a heart on top, blush cheeks), Lyra (tall bunny ears). The last four take the general vibe of characters Nafis listed, in our own designs. No Bandai characters or sprites.
 - **Reference:** Christina's physical Tamagotchi. Photograph its screens for layout and icon reference.
 
 ## Architecture

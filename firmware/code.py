@@ -183,7 +183,7 @@ def on_death():
 
 
 def on_reset():
-    log("reset: new pet: " + game.pet.summary())
+    log("reset: new pet: %s hatching, %s" % (game.character, game.pet.summary()))
     brighten("reset")
     sounds.play(sound.STARTUP)
 
@@ -216,7 +216,7 @@ log(
         "muted" if MUTE else "volume %g" % VOLUME,
     )
 )
-log("pet: " + game.pet.summary())
+log("pet: %s hatching, %s" % (game.character, game.pet.summary()))
 
 CRASH_NVM_BYTES = 24  # where safemode.py leaves the name of the crash it recovered from
 
@@ -233,6 +233,7 @@ def report_reset():
 
 
 report_reset()
+game.hatch(clock_ms() / 1000.0)  # setup took a second or so: start the egg from the top now
 sounds.play(sound.STARTUP)
 
 _idle_ms = int(IDLE_SECONDS * 1000)

@@ -28,3 +28,5 @@ Status: `todo` · `in progress` · `review` · `blocked` · `done`
 | T21 | Pet art: Sprout replaces the ghost; gamepad Play icon | 4 | T8 | Claude | done | [#6](https://github.com/Naaafis/Tamagotchi-ESP/pull/6) |
 | T22 | `code.py` restarts itself after an error in the game loop instead of stopping on the traceback | 6 | T11 | Claude | review | [#7](https://github.com/Naaafis/Tamagotchi-ESP/pull/7) |
 | T23 | Hold right 10 s: sound off / back on | 5 | T11 | Claude | review | [#9](https://github.com/Naaafis/Tamagotchi-ESP/pull/9) |
+| T24 | Egg hatch at power-on and after the reset hold, into one of five critters at random (Sprout + Dabble, Ribbon, Heartlet, Lyra) | 4 | T21 | Claude | in progress | `task/T24-egg-characters` |
+| T25 | Death after 15 min with no button press (sleep pauses it); the sulk death stays | 5 | T20 | Claude | in progress | `task/T24-egg-characters` |

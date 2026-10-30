@@ -20,7 +20,7 @@ class Hooks:
 
 
 def new_game():
-    g = Game(now=0.0, build_ui=False)
+    g = Game(now=0.0, build_ui=False, hatch=False)
     for name in STAT_NAMES:  # nothing needed, so only poops ask for attention
         g.pet.stats[name] = STAT_MAX
     g.update(0.0)
@@ -133,7 +133,7 @@ def test_holding_middle_ten_seconds_starts_a_new_pet():
     end = run(g, end, 0.5, ["B"])
     assert not g.pet.dead
     assert hooks.calls.count("reset") == 1
-    assert g.scene is None
+    assert g.hatching  # the new pet hatches
     run(g, end, RESET_HOLD_SECONDS + 1, ["B"])  # still the same hold: no second reset
     assert hooks.calls.count("reset") == 1
 

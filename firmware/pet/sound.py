@@ -60,7 +60,16 @@ STARTUP = ((2093, 60), (0, 30), (3136, 90))
 # The sound going off (holding right): a falling octave, the last thing it plays.
 MUTE = ((2093, 60), (0, 30), (1047, 150))
 
-TUNES = (TICK, CHIRP, HAPPY, BLIP, PLOP, FLUSH, REFUSE, MATCH, MISS, SAD, DIE, STARTUP, MUTE)
+# Hatching: a soft knock for each wobble of the egg, a crackle for each
+# crack, and a little fanfare as it pops (up C6 E6 G6 C7, then a trill).
+WOBBLE = ((1047, 30),)
+CRACK = ((3136, 20), (0, 30), (2637, 20), (0, 30), (3520, 30))
+HATCH = (
+    (1047, 70), (0, 20), (1319, 70), (0, 20), (1568, 70), (0, 20),
+    (2093, 100), (0, 30), (2637, 60), (2093, 60), (2637, 160),
+)
+
+TUNES = (TICK, CHIRP, HAPPY, BLIP, PLOP, FLUSH, REFUSE, MATCH, MISS, SAD, DIE, STARTUP, MUTE, WOBBLE, CRACK, HATCH)
 NAMES = {
     TICK: "tick",
     CHIRP: "chirp",
@@ -75,6 +84,9 @@ NAMES = {
     SAD: "sad",
     STARTUP: "startup",
     MUTE: "mute",
+    WOBBLE: "wobble",
+    CRACK: "crack",
+    HATCH: "hatch",
 }
 
 # The tune for each cue (pet.anim, pet.minigame, and the game's "plop").
@@ -90,6 +102,9 @@ CUES = {
     "miss": MISS,
     "win": HAPPY,
     "lose": SAD,
+    "wobble": WOBBLE,
+    "crack": CRACK,
+    "hatch": HATCH,
 }
 
 # While the pet keeps asking for attention, chirp again this often. Counted

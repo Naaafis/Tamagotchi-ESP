@@ -70,7 +70,7 @@ def test_every_cue_the_animations_use_has_a_tune():
 
     used = set()
     frame_sets = list(anim.ACTIONS.values()) + list(anim.REFUSALS.values())
-    frame_sets += [anim.clean_frames(1), anim.DIE]
+    frame_sets += [anim.clean_frames(1), anim.DIE, anim.HATCH]
     frame_sets += [minigame.MATCH, minigame.MISS, minigame.WIN, minigame.LOSE]
     for frames in frame_sets:
         for f in frames:
@@ -154,7 +154,7 @@ def test_mute_reaches_no_player_but_still_reports():
 
 
 def wired_game():
-    g = Game(now=0.0, build_ui=False)
+    g = Game(now=0.0, build_ui=False, hatch=False)
     rec = Recorder()
     s = Sounds(rec)
     g.on_button = lambda name: s.button()
@@ -216,7 +216,7 @@ def test_toggle_mute_says_bye_then_goes_quiet_and_comes_back_with_the_hello():
 
 
 def test_holding_right_mutes_and_unmutes_the_game():
-    g = Game(now=0.0, build_ui=False)
+    g = Game(now=0.0, build_ui=False, hatch=False)
     rec = Recorder()
     s = Sounds(rec)
     g.on_button = lambda name: s.button()
